@@ -28,7 +28,7 @@ type BoxedErrorHandler = Arc<dyn ErrorHandler>;
 
 /// Main application
 pub struct RustApi<S = ()> {
-    routes: Vec<(Method, String, BoxedHandler<S>)>,
+    routes: Vec<(Method, String, BoxedHandler<S>, Vec<BoxedMiddleware<S>>)>,
     middlewares: Vec<BoxedMiddleware<S>>,
     state: Option<Arc<S>>,
     router: Option<matchit::Router<(BoxedHandler<S>, Vec<BoxedMiddleware<S>>)>>,
@@ -93,8 +93,12 @@ impl<S: Send + Sync + 'static> RustApi<S> {
     where
         H: IntoHandler<S, T>,
     {
-        self.routes
-            .push((Method::GET, path.to_string(), handler.into_handler()));
+        self.routes.push((
+            Method::GET,
+            path.to_string(),
+            handler.into_handler(),
+            Vec::new(), // No route-specific middleware
+        ));
         self
     }
 
@@ -103,8 +107,12 @@ impl<S: Send + Sync + 'static> RustApi<S> {
     where
         H: IntoHandler<S, T>,
     {
-        self.routes
-            .push((Method::POST, path.to_string(), handler.into_handler()));
+        self.routes.push((
+            Method::POST,
+            path.to_string(),
+            handler.into_handler(),
+            Vec::new(), // No route-specific middleware
+        ));
         self
     }
 
@@ -113,8 +121,12 @@ impl<S: Send + Sync + 'static> RustApi<S> {
     where
         H: IntoHandler<S, T>,
     {
-        self.routes
-            .push((Method::PUT, path.to_string(), handler.into_handler()));
+        self.routes.push((
+            Method::PUT,
+            path.to_string(),
+            handler.into_handler(),
+            Vec::new(), // No route-specific middleware
+        ));
         self
     }
 
@@ -123,8 +135,12 @@ impl<S: Send + Sync + 'static> RustApi<S> {
     where
         H: IntoHandler<S, T>,
     {
-        self.routes
-            .push((Method::DELETE, path.to_string(), handler.into_handler()));
+        self.routes.push((
+            Method::DELETE,
+            path.to_string(),
+            handler.into_handler(),
+            Vec::new(), // No route-specific middleware
+        ));
         self
     }
 
@@ -133,18 +149,47 @@ impl<S: Send + Sync + 'static> RustApi<S> {
     where
         H: IntoHandler<S, T>,
     {
+        self.routes.push((
+            Method::PATCH,
+            path.to_string(),
+            handler.into_handler(),
+            Vec::new(), // No route-specific middleware
+        ));
+        self
+    }
+
+    /// Add a route with its own middleware
+    ///
+    /// This allows applying middleware to specific routes instead of globally.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use rust_api::prelude::*;
+    ///
+    /// let app = RustApi::new()
+    ///     .route(
+    ///         Route::get("/admin", admin_handler)
+    ///             .layer(auth_middleware)
+    ///     )
+    ///     .route(
+    ///         Route::post("/api/data", create_handler)
+    ///             .layer(validate_middleware)
+    ///             .layer(rate_limit_middleware)
+    ///     );
+    /// ```
+    pub fn route(mut self, route: crate::Route<S>) -> Self {
         self.routes
-            .push((Method::PATCH, path.to_string(), handler.into_handler()));
+            .push((route.method, route.path, route.handler, route.middlewares));
         self
     }
 
     /// Nest a router at a path prefix
     pub fn nest(mut self, prefix: &str, router: Router<S>) -> Self {
         let flattened = router.flatten(prefix);
-        for (method, path, handler, mut middlewares) in flattened {
-            let mut combined = self.middlewares.clone();
-            combined.append(&mut middlewares);
-            self.routes.push((method, path, handler));
+        for (method, path, handler, middlewares) in flattened {
+            // Router's middlewares are already stored, just push the route
+            self.routes.push((method, path, handler, middlewares));
         }
         self
     }
@@ -158,11 +203,16 @@ impl<S: Send + Sync + 'static> RustApi<S> {
             Vec<(String, BoxedHandler<S>, Vec<BoxedMiddleware<S>>)>,
         > = HashMap::new();
 
-        for (method, path, handler) in self.routes.drain(..) {
+        for (method, path, handler, route_middlewares) in self.routes.drain(..) {
+            // Combine global middleware + route-specific middleware
+            // Global middleware runs first, then route-specific
+            let mut combined_middlewares = self.middlewares.clone();
+            combined_middlewares.extend(route_middlewares);
+
             method_routes.entry(method).or_insert_with(Vec::new).push((
                 path,
                 handler,
-                self.middlewares.clone(),
+                combined_middlewares,
             ));
         }
 

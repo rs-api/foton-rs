@@ -45,6 +45,7 @@ mod middleware;
 mod middleware_helpers;
 mod req;
 mod res;
+pub mod route;
 mod router;
 
 // Re-exports
@@ -59,6 +60,7 @@ pub use middleware::{Middleware, Next};
 pub use middleware_helpers::{CombinedMiddleware, ConditionalMiddleware, MiddlewareChain};
 pub use req::Req;
 pub use res::{Res, ResBuilder};
+pub use route::Route;
 pub use router::Router;
 
 /// Prelude module for convenient imports
@@ -66,6 +68,6 @@ pub mod prelude {
     pub use crate::extractors::{Form, FromRequest, Json, Path, Query, State};
     pub use crate::{
         DefaultErrorHandler, Error, ErrorHandler, Extensions, FnErrorHandler, Handler, IntoRes,
-        JsonErrorHandler, Middleware, Next, Req, Res, Result, Router, RustApi,
+        JsonErrorHandler, Middleware, Next, Req, Res, Result, Route, Router, RustApi,
     };
 }

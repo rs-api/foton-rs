@@ -10,6 +10,7 @@ members = [
     "examples/middleware-composition",
     "examples/extensions-demo",
     "examples/error-handlers",
+    "examples/per-route-middleware",
 ]
 resolver = "2"
 
