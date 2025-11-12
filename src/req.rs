@@ -14,6 +14,8 @@ use std::collections::HashMap;
 
 use crate::{Error, Result};
 
+static EMPTY_BYTES: Bytes = Bytes::new();
+
 /// HTTP request
 pub struct Req {
     inner: Request<Incoming>,
@@ -74,6 +76,16 @@ impl Req {
     /// Get all path parameters
     pub fn params(&self) -> &HashMap<String, String> {
         &self.path_params
+    }
+
+    /// Get path parameters (used by extractors)
+    pub(crate) fn path_params(&self) -> &HashMap<String, String> {
+        &self.path_params
+    }
+
+    /// Get the body bytes (used by extractors)
+    pub(crate) fn body(&self) -> &Bytes {
+        self.body_bytes.as_ref().unwrap_or(&EMPTY_BYTES)
     }
 
     /// Read the entire body as bytes (consumes the body)

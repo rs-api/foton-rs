@@ -5,7 +5,7 @@
 use hyper::Method;
 use std::sync::Arc;
 
-use crate::{Handler, IntoRes, Middleware, handler::FnHandler, middleware::FnMiddleware};
+use crate::{Handler, Middleware, handler::IntoHandler, middleware::FnMiddleware};
 
 type BoxedHandler<S> = Arc<dyn Handler<S>>;
 type BoxedMiddleware<S> = Arc<dyn Middleware<S>>;
@@ -28,68 +28,52 @@ impl<S: Send + Sync + 'static> Router<S> {
     }
 
     /// Add GET route
-    pub fn get<F, Fut>(mut self, path: &str, handler: F) -> Self
+    pub fn get<H, T>(mut self, path: &str, handler: H) -> Self
     where
-        F: Fn(crate::Req) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future + Send + 'static,
-        Fut::Output: IntoRes,
+        H: IntoHandler<S, T>,
     {
         self.routes
-            .push((Method::GET, path.to_string(), Arc::new(FnHandler(handler))));
+            .push((Method::GET, path.to_string(), handler.into_handler()));
         self
     }
 
     /// Add POST route
-    pub fn post<F, Fut>(mut self, path: &str, handler: F) -> Self
+    pub fn post<H, T>(mut self, path: &str, handler: H) -> Self
     where
-        F: Fn(crate::Req) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future + Send + 'static,
-        Fut::Output: IntoRes,
+        H: IntoHandler<S, T>,
     {
         self.routes
-            .push((Method::POST, path.to_string(), Arc::new(FnHandler(handler))));
+            .push((Method::POST, path.to_string(), handler.into_handler()));
         self
     }
 
     /// Add PUT route
-    pub fn put<F, Fut>(mut self, path: &str, handler: F) -> Self
+    pub fn put<H, T>(mut self, path: &str, handler: H) -> Self
     where
-        F: Fn(crate::Req) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future + Send + 'static,
-        Fut::Output: IntoRes,
+        H: IntoHandler<S, T>,
     {
         self.routes
-            .push((Method::PUT, path.to_string(), Arc::new(FnHandler(handler))));
+            .push((Method::PUT, path.to_string(), handler.into_handler()));
         self
     }
 
     /// Add DELETE route
-    pub fn delete<F, Fut>(mut self, path: &str, handler: F) -> Self
+    pub fn delete<H, T>(mut self, path: &str, handler: H) -> Self
     where
-        F: Fn(crate::Req) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future + Send + 'static,
-        Fut::Output: IntoRes,
+        H: IntoHandler<S, T>,
     {
-        self.routes.push((
-            Method::DELETE,
-            path.to_string(),
-            Arc::new(FnHandler(handler)),
-        ));
+        self.routes
+            .push((Method::DELETE, path.to_string(), handler.into_handler()));
         self
     }
 
     /// Add PATCH route
-    pub fn patch<F, Fut>(mut self, path: &str, handler: F) -> Self
+    pub fn patch<H, T>(mut self, path: &str, handler: H) -> Self
     where
-        F: Fn(crate::Req) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future + Send + 'static,
-        Fut::Output: IntoRes,
+        H: IntoHandler<S, T>,
     {
-        self.routes.push((
-            Method::PATCH,
-            path.to_string(),
-            Arc::new(FnHandler(handler)),
-        ));
+        self.routes
+            .push((Method::PATCH, path.to_string(), handler.into_handler()));
         self
     }
 

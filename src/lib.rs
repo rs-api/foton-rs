@@ -23,7 +23,7 @@
 //!
 //! ## Features
 //!
-//! - Fast async runtime with HTTP/1 and HTTP/2 support
+//! - Fast async runtime
 //! - Intuitive routing with nested routers
 //! - Type-safe state management
 //! - Composable middleware
@@ -35,20 +35,19 @@
 
 mod api;
 mod error;
+pub mod extractors;
 mod handler;
 mod into_res;
+pub mod layers;
 mod middleware;
 mod req;
 mod res;
 mod router;
 
-pub mod extractors;
-pub mod layers;
-
 // Re-exports
 pub use api::RustApi;
 pub use error::{Error, Result};
-pub use handler::Handler;
+pub use handler::{FnHandler, FnHandler1, FnHandler2, FnHandler3, Handler};
 pub use into_res::IntoRes;
 pub use middleware::{Middleware, Next};
 pub use req::Req;
@@ -57,6 +56,6 @@ pub use router::Router;
 
 /// Prelude module for convenient imports
 pub mod prelude {
-    pub use crate::extractors::{Json, Path, Query, State};
+    pub use crate::extractors::{Form, Json, Path, Query, State};
     pub use crate::{Error, Handler, IntoRes, Middleware, Next, Req, Res, Result, Router, RustApi};
 }

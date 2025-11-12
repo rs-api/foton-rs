@@ -1,50 +1,131 @@
 use rust_api::prelude::*;
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+struct SearchParams {
+    q: String,
+    page: Option<u32>,
+}
+
+#[derive(Deserialize)]
+struct ContactForm {
+    name: String,
+    email: String,
+    message: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct CreateUser {
+    username: String,
+    email: String,
+    age: u32,
+}
+
+#[derive(Serialize)]
+struct ApiResponse {
+    success: bool,
+    message: String,
+    data: Option<serde_json::Value>,
+}
 
 async fn home(_req: Req) -> Res {
     Res::html(
         r#"
 <!DOCTYPE html>
 <html>
+<head><title>Extractor Examples</title></head>
 <body>
-    <h2>Form Handling Example</h2>
+    <h2>Form Handling with Extractors</h2>
+
+    <h3>Form Extractor (POST)</h3>
     <form action="/submit" method="post">
-        Name: <input type="text" name="name"><br>
-        Email: <input type="email" name="email"><br>
-        <input type="submit" value="Submit">
+        Name: <input type="text" name="name" required><br>
+        Email: <input type="email" name="email" required><br>
+        Message: <textarea name="message"></textarea><br>
+        <input type="submit" value="Submit Form">
     </form>
-    <p>Try also: <a href="/search?q=rust&page=1">GET with query params</a></p>
+
+    <h3>Query Extractor (GET)</h3>
+    <p>Try: <a href="/search?q=rust&page=1">/search?q=rust&page=1</a></p>
+    <p>Or: <a href="/search?q=web+framework">/search?q=web framework</a></p>
+
+    <h3>JSON Extractor (POST)</h3>
+    <p>POST to /api/users with JSON body:</p>
+    <pre>
+curl -X POST http://127.0.0.1:3003/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","email":"alice@example.com","age":25}'
+    </pre>
 </body>
 </html>
     "#,
     )
 }
 
-async fn submit(_req: Req) -> Res {
-    // Note: Full form parsing will be available when extractors are complete
-    Res::json(&serde_json::json!({
-        "message": "Form submitted successfully",
-        "note": "Form extractors coming soon"
-    }))
+async fn submit(Form(form): Form<ContactForm>) -> Res {
+    Res::json(&ApiResponse {
+        success: true,
+        message: format!("Thank you, {}! We received your message.", form.name),
+        data: Some(serde_json::json!({
+            "email": form.email,
+            "has_message": form.message.is_some(),
+        })),
+    })
 }
 
-async fn search(_req: Req) -> Res {
-    // Note: Query parameter extraction will be available when Query<T> is complete
-    Res::json(&serde_json::json!({
-        "message": "Search results",
-        "note": "Query extractors coming soon"
-    }))
+async fn search(Query(params): Query<SearchParams>) -> Res {
+    let page = params.page.unwrap_or(1);
+
+    Res::json(&ApiResponse {
+        success: true,
+        message: format!("Search results for '{}' (page {})", params.q, page),
+        data: Some(serde_json::json!({
+            "query": params.q,
+            "page": page,
+            "results": ["Result 1", "Result 2", "Result 3"],
+        })),
+    })
+}
+
+async fn create_user(Json(user): Json<CreateUser>) -> Res {
+    if user.age < 18 {
+        return Res::builder().status(400).json(&ApiResponse {
+            success: false,
+            message: "User must be at least 18 years old".to_string(),
+            data: None,
+        });
+    }
+
+    Res::json(&ApiResponse {
+        success: true,
+        message: format!("User '{}' created successfully", user.username),
+        data: Some(serde_json::json!({
+            "id": 1,
+            "username": user.username,
+            "email": user.email,
+            "age": user.age,
+        })),
+    })
 }
 
 #[tokio::main]
 async fn main() {
     let app = RustApi::new()
-        .max_body_size(1024 * 1024) // 1MB for forms (default is 64KB)
+        .max_body_size(1024 * 1024) // 1MB for forms and JSON
         .get("/", home)
         .post("/submit", submit)
-        .get("/search", search);
+        .get("/search", search)
+        .post("/api/users", create_user);
 
     println!("Listening on http://127.0.0.1:3003");
     println!("Max body size: 1MB");
+    println!("");
+    println!("Examples:");
+    println!("  - GET  http://127.0.0.1:3003/");
+    println!("  - GET  http://127.0.0.1:3003/search?q=rust&page=1");
+    println!("  - POST http://127.0.0.1:3003/submit (form data)");
+    println!("  - POST http://127.0.0.1:3003/api/users (JSON)");
+
     app.listen(([127, 0, 0, 1], 3003))
         .await
         .expect("Failed to start server");
