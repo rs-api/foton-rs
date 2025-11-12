@@ -11,5 +11,5 @@ categories = ["web-programming"]
 readme = "README.md"
 
 [dependencies]
-rust-api = { path = "../../" }
+rust-api = "0.0.2"
 async-trait = "0.1"
