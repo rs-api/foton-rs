@@ -1,6 +1,4 @@
-//! Router for organizing routes into groups
-//!
-//! Use [`Router`] to create nested route groups with their own middleware.
+//! Route organization and nesting.
 
 use hyper::Method;
 use std::sync::Arc;
@@ -10,7 +8,7 @@ use crate::{Handler, Middleware, handler::IntoHandler, middleware::FnMiddleware}
 type BoxedHandler<S> = Arc<dyn Handler<S>>;
 type BoxedMiddleware<S> = Arc<dyn Middleware<S>>;
 
-/// Route group for organizing endpoints
+/// Router for grouping and nesting routes.
 pub struct Router<S = ()> {
     routes: Vec<(Method, String, BoxedHandler<S>)>,
     middlewares: Vec<BoxedMiddleware<S>>,
@@ -18,7 +16,7 @@ pub struct Router<S = ()> {
 }
 
 impl<S: Send + Sync + 'static> Router<S> {
-    /// Create new router
+    /// Create router.
     pub fn new() -> Self {
         Self {
             routes: Vec::new(),
@@ -27,7 +25,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         }
     }
 
-    /// Add GET route
+    /// Register GET route.
     pub fn get<H, T>(mut self, path: &str, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -37,7 +35,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         self
     }
 
-    /// Add POST route
+    /// Register POST route.
     pub fn post<H, T>(mut self, path: &str, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -47,7 +45,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         self
     }
 
-    /// Add PUT route
+    /// Register PUT route.
     pub fn put<H, T>(mut self, path: &str, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -57,7 +55,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         self
     }
 
-    /// Add DELETE route
+    /// Register DELETE route.
     pub fn delete<H, T>(mut self, path: &str, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -67,7 +65,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         self
     }
 
-    /// Add PATCH route
+    /// Register PATCH route.
     pub fn patch<H, T>(mut self, path: &str, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -77,7 +75,7 @@ impl<S: Send + Sync + 'static> Router<S> {
         self
     }
 
-    /// Add middleware layer
+    /// Add middleware to all routes in this router.
     pub fn layer<F, Fut>(mut self, middleware: F) -> Self
     where
         F: Fn(crate::Req, Arc<S>, crate::Next<S>) -> Fut + Send + Sync + 'static,
@@ -87,20 +85,18 @@ impl<S: Send + Sync + 'static> Router<S> {
         self
     }
 
-    /// Nest another router at a path prefix
+    /// Nest router at path prefix.
     pub fn nest(mut self, prefix: &str, router: Router<S>) -> Self {
         self.nested.push((prefix.to_string(), router));
         self
     }
 
-    /// Flatten router into routes with full paths
     pub(crate) fn flatten(
         &self,
         prefix: &str,
     ) -> Vec<(Method, String, BoxedHandler<S>, Vec<BoxedMiddleware<S>>)> {
         let mut flattened = Vec::new();
 
-        // Add direct routes
         for (method, path, handler) in &self.routes {
             let full_path = format!("{}{}", prefix, path);
             flattened.push((
@@ -111,12 +107,10 @@ impl<S: Send + Sync + 'static> Router<S> {
             ));
         }
 
-        // Recursively flatten nested routers
         for (nested_prefix, nested_router) in &self.nested {
             let full_prefix = format!("{}{}", prefix, nested_prefix);
             let mut nested_routes = nested_router.flatten(&full_prefix);
 
-            // Add parent middleware to nested routes
             for (_, _, _, middlewares) in &mut nested_routes {
                 let mut combined = self.middlewares.clone();
                 combined.append(middlewares);

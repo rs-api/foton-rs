@@ -1,25 +1,18 @@
-//! Type-safe extractors for request data
-//!
-//! This module provides extractors for common request data types:
-//! - `Query<T>` - URL query parameters
-//! - `Form<T>` - Form data
-//! - `Json<T>` - JSON body
-//! - `Path<T>` - Path parameters
-//! - `State<S>` - Application state
+//! Type-safe request data extraction.
 
 use crate::{Error, Req, Result};
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 
-/// Extract data from request
+/// Extract data from incoming requests.
 #[async_trait]
 pub trait FromRequest<S = ()>: Sized {
-    /// Extract from request
+    /// Extract from request.
     async fn from_request(req: &mut Req, state: &Arc<S>) -> Result<Self>;
 }
 
-/// Extract application state
+/// Extract application state.
 pub struct State<S>(pub S);
 
 #[async_trait]
@@ -32,23 +25,7 @@ where
     }
 }
 
-/// Extract query parameters from URL
-///
-/// Deserializes URL query string into a type using serde_urlencoded.
-///
-/// # Example
-///
-/// ```ignore
-/// #[derive(Deserialize)]
-/// struct SearchParams {
-///     q: String,
-///     page: Option<u32>,
-/// }
-///
-/// async fn search(Query(params): Query<SearchParams>) -> Res {
-///     // params.q and params.page are available
-/// }
-/// ```
+/// Extract URL query parameters.
 pub struct Query<T>(pub T);
 
 #[async_trait]
@@ -70,23 +47,9 @@ where
     }
 }
 
-/// Extract form data from request body
+/// Extract form data from request body.
 ///
-/// Content-Type must be `application/x-www-form-urlencoded`.
-///
-/// # Example
-///
-/// ```ignore
-/// #[derive(Deserialize)]
-/// struct LoginForm {
-///     username: String,
-///     password: String,
-/// }
-///
-/// async fn login(Form(form): Form<LoginForm>) -> Res {
-///     // form.username and form.password available
-/// }
-/// ```
+/// Requires `Content-Type: application/x-www-form-urlencoded`.
 pub struct Form<T>(pub T);
 
 #[async_trait]
@@ -116,23 +79,9 @@ where
     }
 }
 
-/// Extract JSON from request body
+/// Extract JSON from request body.
 ///
-/// Content-Type must be `application/json`.
-///
-/// # Example
-///
-/// ```ignore
-/// #[derive(Deserialize)]
-/// struct CreateUser {
-///     name: String,
-///     email: String,
-/// }
-///
-/// async fn create(Json(user): Json<CreateUser>) -> Res {
-///     // user.name and user.email available
-/// }
-/// ```
+/// Requires `Content-Type: application/json`.
 pub struct Json<T>(pub T);
 
 #[async_trait]
@@ -160,20 +109,10 @@ where
     }
 }
 
-/// Extract path parameters
+/// Extract path parameters.
 ///
-/// # Example
-///
-/// ```ignore
-/// #[derive(Deserialize)]
-/// struct UserPath {
-///     id: u32,
-/// }
-///
-/// async fn get_user(Path(params): Path<UserPath>) -> Res {
-///     // params.id available
-/// }
-/// ```
+/// Path parameters are always strings and must be deserialized accordingly.
+/// Use `String` fields in the target struct.
 pub struct Path<T>(pub T);
 
 #[async_trait]
@@ -185,33 +124,18 @@ where
     async fn from_request(req: &mut Req, _state: &Arc<S>) -> Result<Self> {
         let params = req.path_params();
 
-        // Serialize to JSON string then deserialize - serde_json can't auto-convert string to int
-        // So the user must use String fields or implement custom deserializer
         let json_str = serde_json::to_string(params).map_err(|e| {
             Error::bad_request(format!("Failed to serialize path parameters: {}", e))
         })?;
 
         let value = serde_json::from_str::<T>(&json_str)
-            .map_err(|e| Error::bad_request(format!("Invalid path parameters: {}. Note: path parameters are strings, use String type or implement custom deserializer for type conversion", e)))?;
+            .map_err(|e| Error::bad_request(format!("Invalid path parameters: {}. Path parameters are strings, use String type or implement custom deserializer", e)))?;
 
         Ok(Path(value))
     }
 }
 
-/// Extract request headers
-///
-/// Provides access to all HTTP headers in the request.
-///
-/// # Example
-///
-/// ```ignore
-/// async fn handler(Headers(headers): Headers) -> Res {
-///     if let Some(auth) = headers.get("authorization") {
-///         // Process authorization header
-///     }
-///     Res::text("OK")
-/// }
-/// ```
+/// Extract all request headers.
 pub struct Headers(pub hyper::HeaderMap);
 
 #[async_trait]
@@ -224,18 +148,7 @@ where
     }
 }
 
-/// Extract raw body bytes
-///
-/// Provides direct access to the request body as bytes without any parsing.
-///
-/// # Example
-///
-/// ```ignore
-/// async fn upload(BodyBytes(data): BodyBytes) -> Res {
-///     // data contains raw bytes
-///     Res::text(format!("Received {} bytes", data.len()))
-/// }
-/// ```
+/// Extract raw request body as bytes.
 pub struct BodyBytes(pub bytes::Bytes);
 
 #[async_trait]

@@ -1,7 +1,4 @@
-//! Middleware for request/response processing
-//!
-//! Middleware can intercept requests before they reach handlers,
-//! enabling features like logging, authentication, and CORS.
+//! Middleware for request/response processing.
 
 use async_trait::async_trait;
 use std::future::Future;
@@ -9,14 +6,14 @@ use std::sync::Arc;
 
 use crate::{Req, Res};
 
-/// Middleware that can process requests before handlers
+/// Middleware processes requests before handlers.
 #[async_trait]
 pub trait Middleware<S = ()>: Send + Sync + 'static {
-    /// Process request and optionally call next middleware/handler
+    /// Process request and optionally pass to next handler.
     async fn handle(&self, req: Req, state: Arc<S>, next: Next<S>) -> Res;
 }
 
-/// Continue to next middleware or handler
+/// Continues to next middleware or handler.
 pub struct Next<S = ()> {
     pub(crate) handler: Arc<dyn Fn(Req, Arc<S>) -> BoxFuture<Res> + Send + Sync>,
     pub(crate) state: Arc<S>,
@@ -25,7 +22,7 @@ pub struct Next<S = ()> {
 type BoxFuture<T> = std::pin::Pin<Box<dyn Future<Output = T> + Send>>;
 
 impl<S: 'static> Next<S> {
-    /// Create new Next
+    /// Create next handler.
     pub fn new(
         handler: Arc<dyn Fn(Req, Arc<S>) -> BoxFuture<Res> + Send + Sync>,
         state: Arc<S>,
@@ -33,13 +30,13 @@ impl<S: 'static> Next<S> {
         Self { handler, state }
     }
 
-    /// Call next middleware or handler
+    /// Pass request to next middleware or handler.
     pub async fn run(self, req: Req) -> Res {
         (self.handler)(req, self.state).await
     }
 }
 
-/// Wrapper for function middleware
+/// Function-based middleware wrapper.
 pub struct FnMiddleware<F>(pub F);
 
 #[async_trait]

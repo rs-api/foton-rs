@@ -1,69 +1,62 @@
-//! Error handling types
-//!
-//! Provides HTTP-aware error types that automatically convert
-//! to appropriate status codes and JSON responses.
+//! Error handling and status codes.
 
 use std::fmt;
 
-/// Standard Result type for Rust Api
+/// Standard Result type for the framework.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Errors that can occur during request handling
+/// HTTP-aware error types.
 #[derive(Debug)]
 pub enum Error {
-    /// HTTP status code error with optional message
+    /// HTTP status code with optional message.
     Status(u16, Option<String>),
-
-    /// JSON serialization/deserialization error
+    /// JSON serialization error.
     Json(String),
-
-    /// HTTP protocol error
+    /// HTTP protocol error.
     Hyper(hyper::Error),
-
-    /// IO error
+    /// IO error.
     Io(std::io::Error),
-
-    /// Custom error message
+    /// Custom error message.
     Custom(String),
 }
 
 impl Error {
-    /// Create a 400 Bad Request error
+    /// Create 400 Bad Request error.
     pub fn bad_request(msg: impl Into<String>) -> Self {
         Self::Status(400, Some(msg.into()))
     }
 
-    /// Create a 401 Unauthorized error
+    /// Create 401 Unauthorized error.
     pub fn unauthorized(msg: impl Into<String>) -> Self {
         Self::Status(401, Some(msg.into()))
     }
 
-    /// Create a 403 Forbidden error
+    /// Create 403 Forbidden error.
     pub fn forbidden(msg: impl Into<String>) -> Self {
         Self::Status(403, Some(msg.into()))
     }
 
-    /// Create a 404 Not Found error
+    /// Create 404 Not Found error.
     pub fn not_found(msg: impl Into<String>) -> Self {
         Self::Status(404, Some(msg.into()))
     }
 
-    /// Create a 413 Payload Too Large error
+    /// Create 413 Payload Too Large error.
     pub fn payload_too_large(msg: impl Into<String>) -> Self {
         Self::Status(413, Some(msg.into()))
     }
 
-    /// Create a 422 Unprocessable Entity error
+    /// Create 422 Unprocessable Entity error.
     pub fn unprocessable(msg: impl Into<String>) -> Self {
         Self::Status(422, Some(msg.into()))
     }
 
-    /// Create a 500 Internal Server Error
+    /// Create 500 Internal Server Error.
     pub fn internal(msg: impl Into<String>) -> Self {
         Self::Status(500, Some(msg.into()))
     }
 
-    /// Create a custom status code error
+    /// Create custom status code error.
     pub fn status(code: u16) -> Self {
         Self::Status(code, None)
     }

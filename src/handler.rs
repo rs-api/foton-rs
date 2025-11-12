@@ -1,9 +1,4 @@
-//! Request handler trait
-//!
-//! Handlers are async functions that take a [`Req`](crate::Req)
-//! and return anything that implements [`IntoRes`](crate::IntoRes).
-//!
-//! Handlers can also use extractors for type-safe request data extraction.
+//! Request handlers with extractor support.
 
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -11,23 +6,21 @@ use std::sync::Arc;
 use crate::extractors::FromRequest;
 use crate::{IntoRes, Req, Res};
 
-/// Convert a function into a boxed handler
+/// Convert function into boxed handler.
 pub trait IntoHandler<S, T> {
-    /// Convert into boxed handler
     fn into_handler(self) -> Arc<dyn Handler<S>>;
 }
 
-/// Request handler
+/// Request handler.
 #[async_trait]
 pub trait Handler<S = ()>: Send + Sync + 'static {
-    /// Handle a request
+    /// Handle incoming request.
     async fn call(&self, req: Req, state: Arc<S>) -> Res;
 }
 
-/// Wrapper for function handlers
+/// Function handler wrapper.
 pub struct FnHandler<F>(pub F);
 
-// Handler with no extractors - just Req
 #[async_trait]
 impl<F, Fut, S> Handler<S> for FnHandler<F>
 where
@@ -41,14 +34,14 @@ where
     }
 }
 
-/// Wrapper for handlers with one extractor
+/// Handler with one extractor.
 pub struct FnHandler1<F, E1> {
     handler: F,
     _marker: std::marker::PhantomData<E1>,
 }
 
 impl<F, E1> FnHandler1<F, E1> {
-    /// Create new handler wrapper
+    /// Create handler wrapper.
     pub fn new(handler: F) -> Self {
         Self {
             handler,
@@ -76,14 +69,14 @@ where
     }
 }
 
-/// Wrapper for handlers with two extractors
+/// Handler with two extractors.
 pub struct FnHandler2<F, E1, E2> {
     handler: F,
     _marker: std::marker::PhantomData<(E1, E2)>,
 }
 
 impl<F, E1, E2> FnHandler2<F, E1, E2> {
-    /// Create new handler wrapper
+    /// Create handler wrapper.
     pub fn new(handler: F) -> Self {
         Self {
             handler,
@@ -117,14 +110,14 @@ where
     }
 }
 
-/// Wrapper for handlers with three extractors
+/// Handler with three extractors.
 pub struct FnHandler3<F, E1, E2, E3> {
     handler: F,
     _marker: std::marker::PhantomData<(E1, E2, E3)>,
 }
 
 impl<F, E1, E2, E3> FnHandler3<F, E1, E2, E3> {
-    /// Create new handler wrapper
+    /// Create handler wrapper.
     pub fn new(handler: F) -> Self {
         Self {
             handler,
@@ -164,9 +157,7 @@ where
     }
 }
 
-// IntoHandler implementations
-
-/// Marker for no extractors
+/// Marker for no extractors.
 pub struct NoExtractors;
 
 impl<F, Fut, S> IntoHandler<S, NoExtractors> for F
@@ -181,7 +172,7 @@ where
     }
 }
 
-/// Marker for one extractor
+/// Marker for one extractor.
 pub struct OneExtractor;
 
 impl<F, Fut, S, E1> IntoHandler<S, (OneExtractor, E1)> for F
@@ -197,7 +188,7 @@ where
     }
 }
 
-/// Marker for two extractors
+/// Marker for two extractors.
 pub struct TwoExtractors;
 
 impl<F, Fut, S, E1, E2> IntoHandler<S, (TwoExtractors, E1, E2)> for F
@@ -214,7 +205,7 @@ where
     }
 }
 
-/// Marker for three extractors
+/// Marker for three extractors.
 pub struct ThreeExtractors;
 
 impl<F, Fut, S, E1, E2, E3> IntoHandler<S, (ThreeExtractors, E1, E2, E3)> for F

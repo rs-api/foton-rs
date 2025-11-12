@@ -1,13 +1,11 @@
-//! Per-route middleware support
-//!
-//! Routes can have their own middleware that only applies to that specific route.
+//! Per-route middleware support.
 
 use hyper::Method;
 use std::sync::Arc;
 
 use crate::{Handler, Middleware, handler::IntoHandler, middleware::FnMiddleware};
 
-/// A route with optional middleware
+/// Route with optional middleware.
 pub struct Route<S = ()> {
     pub(crate) method: Method,
     pub(crate) path: String,
@@ -16,7 +14,6 @@ pub struct Route<S = ()> {
 }
 
 impl<S: Send + Sync + 'static> Route<S> {
-    /// Create a new route
     pub(crate) fn new(method: Method, path: String, handler: Arc<dyn Handler<S>>) -> Self {
         Self {
             method,
@@ -26,20 +23,7 @@ impl<S: Send + Sync + 'static> Route<S> {
         }
     }
 
-    /// Add middleware to this route
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// use rust_api::prelude::*;
-    ///
-    /// let app = RustApi::new()
-    ///     .route(
-    ///         Route::get("/admin", admin_handler)
-    ///             .layer(auth_middleware)
-    ///             .layer(rate_limit_middleware)
-    ///     );
-    /// ```
+    /// Add middleware to this route.
     pub fn layer<F, Fut>(mut self, middleware: F) -> Self
     where
         F: Fn(crate::Req, Arc<S>, crate::Next<S>) -> Fut + Send + Sync + 'static,
@@ -49,13 +33,13 @@ impl<S: Send + Sync + 'static> Route<S> {
         self
     }
 
-    /// Add middleware from a Middleware trait implementation
+    /// Add middleware from trait implementation.
     pub fn layer_middleware<M: Middleware<S>>(mut self, middleware: M) -> Self {
         self.middlewares.push(Arc::new(middleware));
         self
     }
 
-    /// Helper to create a GET route
+    /// Create GET route.
     pub fn get<H, T>(path: impl Into<String>, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -63,7 +47,7 @@ impl<S: Send + Sync + 'static> Route<S> {
         Self::new(Method::GET, path.into(), handler.into_handler())
     }
 
-    /// Helper to create a POST route
+    /// Create POST route.
     pub fn post<H, T>(path: impl Into<String>, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -71,7 +55,7 @@ impl<S: Send + Sync + 'static> Route<S> {
         Self::new(Method::POST, path.into(), handler.into_handler())
     }
 
-    /// Helper to create a PUT route
+    /// Create PUT route.
     pub fn put<H, T>(path: impl Into<String>, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -79,7 +63,7 @@ impl<S: Send + Sync + 'static> Route<S> {
         Self::new(Method::PUT, path.into(), handler.into_handler())
     }
 
-    /// Helper to create a DELETE route
+    /// Create DELETE route.
     pub fn delete<H, T>(path: impl Into<String>, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -87,7 +71,7 @@ impl<S: Send + Sync + 'static> Route<S> {
         Self::new(Method::DELETE, path.into(), handler.into_handler())
     }
 
-    /// Helper to create a PATCH route
+    /// Create PATCH route.
     pub fn patch<H, T>(path: impl Into<String>, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -95,5 +79,3 @@ impl<S: Send + Sync + 'static> Route<S> {
         Self::new(Method::PATCH, path.into(), handler.into_handler())
     }
 }
-
-// The .route() method is implemented in api.rs to access private fields

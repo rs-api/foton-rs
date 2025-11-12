@@ -1,8 +1,6 @@
-//! # Rust Api
+//! Fast and lightweight web framework for Rust.
 //!
-//! Fast and scalable web framework for Rust.
-//!
-//! ## Example
+//! ## Quick Start
 //!
 //! ```rust,no_run
 //! use rust_api::prelude::*;
@@ -20,15 +18,6 @@
 //!     app.listen(([127, 0, 0, 1], 3000)).await.unwrap();
 //! }
 //! ```
-//!
-//! ## Features
-//!
-//! - Fast async runtime
-//! - Intuitive routing with nested routers
-//! - Type-safe state management
-//! - Composable middleware
-//! - Zero-cost abstractions
-//! - Configurable request body size limits
 
 #![warn(missing_docs)]
 #![warn(rust_2018_idioms)]
@@ -48,7 +37,6 @@ mod res;
 pub mod route;
 mod router;
 
-// Re-exports
 pub use api::RustApi;
 pub use error::{Error, Result};
 pub use error_handler::{DefaultErrorHandler, ErrorHandler, FnErrorHandler, JsonErrorHandler};
@@ -63,7 +51,7 @@ pub use res::{Res, ResBuilder};
 pub use route::Route;
 pub use router::Router;
 
-/// Prelude module for convenient imports
+/// Commonly used types and traits.
 pub mod prelude {
     pub use crate::extractors::{BodyBytes, Form, FromRequest, Headers, Json, Path, Query, State};
     pub use crate::{

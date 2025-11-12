@@ -1,7 +1,4 @@
-//! Main application entry point
-//!
-//! The [`RustApi`] type is the core of the framework, providing
-//! routing, middleware, and state management.
+//! Application builder and server.
 
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -26,7 +23,7 @@ type BoxedHandler<S> = Arc<dyn Handler<S>>;
 type BoxedMiddleware<S> = Arc<dyn Middleware<S>>;
 type BoxedErrorHandler = Arc<dyn ErrorHandler>;
 
-/// Main application
+/// Application builder and HTTP server.
 pub struct RustApi<S = ()> {
     routes: Vec<(Method, String, BoxedHandler<S>, Vec<BoxedMiddleware<S>>)>,
     middlewares: Vec<BoxedMiddleware<S>>,
@@ -36,7 +33,7 @@ pub struct RustApi<S = ()> {
 }
 
 impl RustApi<()> {
-    /// Create new application without state
+    /// Create application without state.
     pub fn new() -> Self {
         Self {
             routes: Vec::new(),
@@ -49,7 +46,7 @@ impl RustApi<()> {
 }
 
 impl<S: Send + Sync + 'static> RustApi<S> {
-    /// Create new application with state
+    /// Create application with shared state.
     pub fn with_state(state: S) -> Self {
         Self {
             routes: Vec::new(),
@@ -60,25 +57,13 @@ impl<S: Send + Sync + 'static> RustApi<S> {
         }
     }
 
-    /// Set a custom error handler
-    ///
-    /// The error handler controls how errors are converted into HTTP responses.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// use rust_api::prelude::*;
-    ///
-    /// let app = RustApi::new()
-    ///     .error_handler(JsonErrorHandler)
-    ///     .get("/", handler);
-    /// ```
+    /// Set custom error handler for transforming errors into responses.
     pub fn error_handler<H: ErrorHandler>(mut self, handler: H) -> Self {
         self.error_handler = Some(Arc::new(handler));
         self
     }
 
-    /// Add global middleware
+    /// Add global middleware that runs on all routes.
     pub fn layer<F, Fut>(mut self, middleware: F) -> Self
     where
         F: Fn(Req, Arc<S>, crate::Next<S>) -> Fut + Send + Sync + 'static,
@@ -88,7 +73,7 @@ impl<S: Send + Sync + 'static> RustApi<S> {
         self
     }
 
-    /// Add GET route
+    /// Register GET route.
     pub fn get<H, T>(mut self, path: &str, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -97,12 +82,12 @@ impl<S: Send + Sync + 'static> RustApi<S> {
             Method::GET,
             path.to_string(),
             handler.into_handler(),
-            Vec::new(), // No route-specific middleware
+            Vec::new(),
         ));
         self
     }
 
-    /// Add POST route
+    /// Register POST route.
     pub fn post<H, T>(mut self, path: &str, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -111,12 +96,12 @@ impl<S: Send + Sync + 'static> RustApi<S> {
             Method::POST,
             path.to_string(),
             handler.into_handler(),
-            Vec::new(), // No route-specific middleware
+            Vec::new(),
         ));
         self
     }
 
-    /// Add PUT route
+    /// Register PUT route.
     pub fn put<H, T>(mut self, path: &str, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -125,12 +110,12 @@ impl<S: Send + Sync + 'static> RustApi<S> {
             Method::PUT,
             path.to_string(),
             handler.into_handler(),
-            Vec::new(), // No route-specific middleware
+            Vec::new(),
         ));
         self
     }
 
-    /// Add DELETE route
+    /// Register DELETE route.
     pub fn delete<H, T>(mut self, path: &str, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -139,12 +124,12 @@ impl<S: Send + Sync + 'static> RustApi<S> {
             Method::DELETE,
             path.to_string(),
             handler.into_handler(),
-            Vec::new(), // No route-specific middleware
+            Vec::new(),
         ));
         self
     }
 
-    /// Add PATCH route
+    /// Register PATCH route.
     pub fn patch<H, T>(mut self, path: &str, handler: H) -> Self
     where
         H: IntoHandler<S, T>,
@@ -153,59 +138,35 @@ impl<S: Send + Sync + 'static> RustApi<S> {
             Method::PATCH,
             path.to_string(),
             handler.into_handler(),
-            Vec::new(), // No route-specific middleware
+            Vec::new(),
         ));
         self
     }
 
-    /// Add a route with its own middleware
-    ///
-    /// This allows applying middleware to specific routes instead of globally.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// use rust_api::prelude::*;
-    ///
-    /// let app = RustApi::new()
-    ///     .route(
-    ///         Route::get("/admin", admin_handler)
-    ///             .layer(auth_middleware)
-    ///     )
-    ///     .route(
-    ///         Route::post("/api/data", create_handler)
-    ///             .layer(validate_middleware)
-    ///             .layer(rate_limit_middleware)
-    ///     );
-    /// ```
+    /// Register route with per-route middleware.
     pub fn route(mut self, route: crate::Route<S>) -> Self {
         self.routes
             .push((route.method, route.path, route.handler, route.middlewares));
         self
     }
 
-    /// Nest a router at a path prefix
+    /// Mount router at path prefix.
     pub fn nest(mut self, prefix: &str, router: Router<S>) -> Self {
         let flattened = router.flatten(prefix);
         for (method, path, handler, middlewares) in flattened {
-            // Router's middlewares are already stored, just push the route
             self.routes.push((method, path, handler, middlewares));
         }
         self
     }
 
-    /// Build the router
     fn build_router(mut self) -> Self {
         let mut router = matchit::Router::new();
-
         let mut method_routes: HashMap<
             Method,
             Vec<(String, BoxedHandler<S>, Vec<BoxedMiddleware<S>>)>,
         > = HashMap::new();
 
         for (method, path, handler, route_middlewares) in self.routes.drain(..) {
-            // Combine global middleware + route-specific middleware
-            // Global middleware runs first, then route-specific
             let mut combined_middlewares = self.middlewares.clone();
             combined_middlewares.extend(route_middlewares);
 
@@ -226,11 +187,10 @@ impl<S: Send + Sync + 'static> RustApi<S> {
         self
     }
 
-    /// Start listening on address
+    /// Start HTTP server on address.
     pub async fn listen(self, addr: impl Into<SocketAddr>) -> Result<()> {
         let addr = addr.into();
         let app = Arc::new(self.build_router());
-
         let listener = TcpListener::bind(addr).await?;
 
         loop {
@@ -260,7 +220,6 @@ impl<S: Send + Sync + 'static> RustApi<S> {
         req: Request<Incoming>,
     ) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
         let path = req.uri().path().to_string();
-
         let mut rust_req = Req::from_hyper(req);
 
         rust_req = match rust_req.consume_body().await {
@@ -280,7 +239,6 @@ impl<S: Send + Sync + 'static> RustApi<S> {
                     }
                     rust_req.set_path_params(params);
 
-                    // Store error handler in extensions if available
                     if let Some(ref error_handler) = self.error_handler {
                         rust_req.extensions_mut().insert(Arc::clone(error_handler));
                     }
@@ -295,15 +253,10 @@ impl<S: Send + Sync + 'static> RustApi<S> {
                         }
                     };
 
-                    // Apply middleware chain
                     if middlewares.is_empty() {
                         handler.call(rust_req, state).await
                     } else {
-                        // Build middleware chain from innermost (handler) to outermost
                         let handler_clone = Arc::clone(handler);
-                        // let state_clone = Arc::clone(&state);
-
-                        // Start with the handler as the innermost function
                         let mut next_fn: Arc<
                             dyn Fn(
                                     Req,
@@ -317,7 +270,6 @@ impl<S: Send + Sync + 'static> RustApi<S> {
                             Box::pin(async move { handler.call(req, state).await })
                         });
 
-                        // Wrap each middleware around the chain (in reverse order)
                         for middleware in middlewares.iter().rev() {
                             let middleware_clone = Arc::clone(middleware);
                             let inner = Arc::clone(&next_fn);
@@ -336,7 +288,6 @@ impl<S: Send + Sync + 'static> RustApi<S> {
                             });
                         }
 
-                        // Execute the middleware chain
                         next_fn(rust_req, state).await
                     }
                 }
