@@ -48,6 +48,11 @@ impl Error {
         Self::Status(404, Some(msg.into()))
     }
 
+    /// Create a 413 Payload Too Large error
+    pub fn payload_too_large(msg: impl Into<String>) -> Self {
+        Self::Status(413, Some(msg.into()))
+    }
+
     /// Create a 422 Unprocessable Entity error
     pub fn unprocessable(msg: impl Into<String>) -> Self {
         Self::Status(422, Some(msg.into()))

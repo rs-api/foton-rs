@@ -109,7 +109,17 @@ impl Req {
     }
 
     pub(crate) async fn consume_body(mut self) -> Result<Self> {
+        // Default max body size: 64KB (following Hyper best practices)
+        const MAX_BODY_SIZE: u64 = 1024 * 64;
+
         let body = self.inner.body_mut();
+
+        // Check body size hint for protection
+        let max = body.size_hint().upper().unwrap_or(u64::MAX);
+        if max > MAX_BODY_SIZE {
+            return Err(Error::payload_too_large("Request body too large"));
+        }
+
         let collected = body
             .collect()
             .await
