@@ -73,7 +73,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 name = "cors-demo"
 version = "0.0.1"
 dependencies = [
- "rust-api",
+ "rust-api 0.0.2",
  "rust-api-cors",
  "serde_json",
  "tokio",
@@ -99,7 +99,7 @@ dependencies = [
 name = "error-handlers"
 version = "0.0.1"
 dependencies = [
- "rust-api",
+ "rust-api 0.0.2",
  "tokio",
 ]
 
@@ -107,7 +107,7 @@ dependencies = [
 name = "extensions-demo"
 version = "0.0.1"
 dependencies = [
- "rust-api",
+ "rust-api 0.0.2",
  "tokio",
 ]
 
@@ -115,7 +115,7 @@ dependencies = [
 name = "extractors-demo"
 version = "0.0.1"
 dependencies = [
- "rust-api",
+ "rust-api 0.0.2",
  "serde",
  "serde_json",
  "tokio",
@@ -135,7 +135,7 @@ dependencies = [
  "futures-util",
  "http-body-util",
  "hyper",
- "rust-api",
+ "rust-api 0.0.2",
  "serde_json",
  "tokio",
  "tokio-util",
@@ -172,7 +172,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 name = "form-handling"
 version = "0.0.1"
 dependencies = [
- "rust-api",
+ "rust-api 0.0.2",
  "serde",
  "serde_json",
  "tokio",
@@ -280,7 +280,7 @@ checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
 name = "hello-world"
 version = "0.0.1"
 dependencies = [
- "rust-api",
+ "rust-api 0.0.2",
  "serde_json",
  "tokio",
 ]
@@ -429,7 +429,7 @@ name = "middleware-composition"
 version = "0.0.1"
 dependencies = [
  "async-trait",
- "rust-api",
+ "rust-api 0.0.2",
  "tokio",
 ]
 
@@ -437,7 +437,7 @@ dependencies = [
 name = "middleware-test"
 version = "0.0.1"
 dependencies = [
- "rust-api",
+ "rust-api 0.0.2",
  "tokio",
 ]
 
@@ -473,7 +473,7 @@ dependencies = [
 name = "nested-routing"
 version = "0.0.1"
 dependencies = [
- "rust-api",
+ "rust-api 0.0.2",
  "serde_json",
  "tokio",
 ]
@@ -555,7 +555,7 @@ dependencies = [
 name = "per-route-middleware"
 version = "0.0.1"
 dependencies = [
- "rust-api",
+ "rust-api 0.0.2",
  "serde_json",
  "tokio",
 ]
@@ -637,6 +637,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "rust-api"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8725d7606914525ccd0a531c7c0a04324175b0df2d392efecba2f02b66eadc6a"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "matchit",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "tokio",
+]
+
+[[package]]
 name = "rust-api-client"
 version = "0.0.1"
 dependencies = [
@@ -656,7 +674,7 @@ name = "rust-api-cors"
 version = "0.0.1"
 dependencies = [
  "async-trait",
- "rust-api",
+ "rust-api 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -812,7 +830,7 @@ dependencies = [
 name = "state-management"
 version = "0.0.1"
 dependencies = [
- "rust-api",
+ "rust-api 0.0.2",
  "serde",
  "serde_json",
  "tokio",
