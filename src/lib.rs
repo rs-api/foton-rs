@@ -29,7 +29,6 @@ pub mod extensions;
 pub mod extractors;
 mod handler;
 mod into_res;
-pub mod layers;
 mod middleware;
 mod middleware_helpers;
 mod req;
