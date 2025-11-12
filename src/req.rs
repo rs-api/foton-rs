@@ -1,7 +1,4 @@
-//! HTTP request wrapper with streaming body support.
-//!
-//! The request body is consumed lazily on-demand when extractors need it,
-//! avoiding unnecessary buffering for requests that don't use the body.
+//! HTTP request with lazy body consumption.
 
 use bytes::Bytes;
 use http_body_util::BodyExt;
@@ -12,20 +9,13 @@ use std::sync::{Arc, Mutex};
 use crate::extensions::Extensions;
 use crate::{Error, Result};
 
-/// Lazy body consumer for streaming support.
-/// Body is only consumed when first accessed by an extractor.
 #[derive(Clone)]
 enum Body {
     Streaming(Arc<Mutex<Option<Incoming>>>),
     Consumed(Bytes),
 }
 
-/// HTTP request with streaming body support.
-///
-/// Body consumption is deferred until first access, enabling:
-/// - Zero-copy for requests without body extractors
-/// - Single buffering for requests with multiple body extractors
-/// - Efficient header-only routing decisions
+/// HTTP request. Body consumed on-demand for zero-copy optimization.
 pub struct Req {
     method: Method,
     uri: Uri,
@@ -104,8 +94,7 @@ impl Req {
         &self.path_params
     }
 
-    /// Consume and read request body as bytes (lazy evaluation).
-    /// Only called when body is actually needed by extractors.
+    /// Consume body as bytes. Called lazily by extractors.
     pub async fn body(&mut self) -> Result<&Bytes> {
         match &self.body {
             Body::Consumed(_) => {
@@ -135,14 +124,13 @@ impl Req {
                         unreachable!()
                     }
                 } else {
-                    // Body already taken (shouldn't happen with proper usage)
                     Err(Error::internal("Request body already consumed"))
                 }
             }
         }
     }
 
-    /// Get content type header value.
+    /// Get Content-Type header.
     #[inline]
     pub fn content_type(&self) -> Option<&str> {
         self.header(header::CONTENT_TYPE.as_str())

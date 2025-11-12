@@ -1,18 +1,18 @@
-//! Request extractors for type-safe data extraction.
+//! Type-safe request extractors.
 
 use crate::{Error, Req, Result};
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use std::sync::Arc;
 
-/// Extract data from incoming requests.
+/// Extract data from request.
 #[async_trait]
 pub trait FromRequest<S = ()>: Sized {
-    /// Extract data from request.
+    /// Extract from request.
     async fn from_request(req: &mut Req, state: &Arc<S>) -> Result<Self>;
 }
 
-/// Extract application state.
+/// Application state extractor.
 pub struct State<S>(pub S);
 
 #[async_trait]
@@ -25,7 +25,7 @@ where
     }
 }
 
-/// Extract URL query parameters.
+/// Query parameters extractor.
 pub struct Query<T>(pub T);
 
 #[async_trait]
@@ -47,7 +47,7 @@ where
     }
 }
 
-/// Extract form data from request body.
+/// Form data extractor.
 pub struct Form<T>(pub T);
 
 #[async_trait]
@@ -77,7 +77,7 @@ where
     }
 }
 
-/// Extract JSON from request body.
+/// JSON extractor.
 pub struct Json<T>(pub T);
 
 #[async_trait]
@@ -105,7 +105,7 @@ where
     }
 }
 
-/// Extract path parameters.
+/// Path parameters extractor.
 pub struct Path<T>(pub T);
 
 #[async_trait]
@@ -128,7 +128,7 @@ where
     }
 }
 
-/// Extract all request headers.
+/// Headers extractor.
 pub struct Headers(pub hyper::HeaderMap);
 
 #[async_trait]
@@ -141,7 +141,7 @@ where
     }
 }
 
-/// Extract raw request body as bytes.
+/// Raw body bytes extractor.
 pub struct BodyBytes(pub bytes::Bytes);
 
 #[async_trait]

@@ -1,9 +1,9 @@
-//! Error handler trait for custom error responses.
+//! Error handler trait.
 
 use crate::{Error, Res};
 
-/// Convert errors into HTTP responses.
+/// Convert errors to responses.
 pub trait ErrorHandler: Send + Sync + 'static {
-    /// Convert error to response.
+    /// Handle error.
     fn handle(&self, error: Error) -> Res;
 }

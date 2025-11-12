@@ -1,4 +1,4 @@
-//! Route organization and nesting.
+//! Router nesting.
 
 use hyper::Method;
 use std::sync::Arc;

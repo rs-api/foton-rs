@@ -1,4 +1,4 @@
-//! Error handling and status codes.
+//! Error types.
 
 use std::fmt;
 

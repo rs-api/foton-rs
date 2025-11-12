@@ -1,4 +1,4 @@
-//! Request handlers with extractor support.
+//! Request handlers.
 
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -6,15 +6,15 @@ use std::sync::Arc;
 use crate::extractors::FromRequest;
 use crate::{IntoRes, Req, Res};
 
-/// Convert function into boxed handler.
+/// Convert function to handler.
 pub trait IntoHandler<S, T> {
     fn into_handler(self) -> Arc<dyn Handler<S>>;
 }
 
-/// Request handler.
+/// Handler trait.
 #[async_trait]
 pub trait Handler<S = ()>: Send + Sync + 'static {
-    /// Handle incoming request.
+    /// Handle request.
     async fn call(&self, req: Req, state: Arc<S>) -> Res;
 }
 
@@ -41,7 +41,7 @@ pub struct FnHandler1<F, E1> {
 }
 
 impl<F, E1> FnHandler1<F, E1> {
-    /// Create handler wrapper.
+    /// New handler.
     pub fn new(handler: F) -> Self {
         Self {
             handler,
@@ -76,7 +76,7 @@ pub struct FnHandler2<F, E1, E2> {
 }
 
 impl<F, E1, E2> FnHandler2<F, E1, E2> {
-    /// Create handler wrapper.
+    /// New handler.
     pub fn new(handler: F) -> Self {
         Self {
             handler,
@@ -117,7 +117,7 @@ pub struct FnHandler3<F, E1, E2, E3> {
 }
 
 impl<F, E1, E2, E3> FnHandler3<F, E1, E2, E3> {
-    /// Create handler wrapper.
+    /// New handler.
     pub fn new(handler: F) -> Self {
         Self {
             handler,

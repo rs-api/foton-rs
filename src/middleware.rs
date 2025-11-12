@@ -1,4 +1,4 @@
-//! Middleware for request/response processing.
+//! Middleware system.
 
 use async_trait::async_trait;
 use std::future::Future;
@@ -6,14 +6,14 @@ use std::sync::Arc;
 
 use crate::{Req, Res};
 
-/// Middleware processes requests before handlers.
+/// Middleware trait.
 #[async_trait]
 pub trait Middleware<S = ()>: Send + Sync + 'static {
-    /// Process request and optionally pass to next handler.
+    /// Handle request.
     async fn handle(&self, req: Req, state: Arc<S>, next: Next<S>) -> Res;
 }
 
-/// Continues to next middleware or handler.
+/// Next handler in chain.
 pub struct Next<S = ()> {
     pub(crate) handler: Arc<dyn Fn(Req, Arc<S>) -> BoxFuture<Res> + Send + Sync>,
     pub(crate) state: Arc<S>,
@@ -22,7 +22,7 @@ pub struct Next<S = ()> {
 type BoxFuture<T> = std::pin::Pin<Box<dyn Future<Output = T> + Send>>;
 
 impl<S: 'static> Next<S> {
-    /// Create next handler.
+    /// New next handler.
     #[inline]
     pub fn new(
         handler: Arc<dyn Fn(Req, Arc<S>) -> BoxFuture<Res> + Send + Sync>,
@@ -31,7 +31,7 @@ impl<S: 'static> Next<S> {
         Self { handler, state }
     }
 
-    /// Pass request to next middleware or handler.
+    /// Run next handler.
     #[inline]
     pub async fn run(self, req: Req) -> Res {
         (self.handler)(req, self.state).await

@@ -1,17 +1,17 @@
-//! HTTP response builder.
+//! HTTP response.
 
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{Response, StatusCode, header};
 use serde::Serialize;
 
-/// HTTP response wrapper.
+/// HTTP response.
 pub struct Res {
     inner: Response<Full<Bytes>>,
 }
 
 impl Res {
-    /// Create response with status 200 OK.
+    /// Create empty 200 response.
     #[inline]
     pub fn new() -> Self {
         Self {
@@ -19,19 +19,19 @@ impl Res {
         }
     }
 
-    /// Create from hyper response.
+    /// Wrap hyper response.
     #[inline]
     pub fn from_hyper(inner: Response<Full<Bytes>>) -> Self {
         Self { inner }
     }
 
-    /// Convert to hyper response.
+    /// Unwrap to hyper response.
     #[inline]
     pub fn into_hyper(self) -> Response<Full<Bytes>> {
         self.inner
     }
 
-    /// Create plain text response.
+    /// Text response.
     pub fn text(body: impl Into<String>) -> Self {
         let body_str = body.into();
         let mut res = Response::new(Full::new(Bytes::from(body_str)));
@@ -42,7 +42,7 @@ impl Res {
         Self { inner: res }
     }
 
-    /// Create HTML response.
+    /// HTML response.
     pub fn html(body: impl Into<String>) -> Self {
         let body_str = body.into();
         let mut res = Response::new(Full::new(Bytes::from(body_str)));
@@ -53,7 +53,7 @@ impl Res {
         Self { inner: res }
     }
 
-    /// Create JSON response.
+    /// JSON response.
     pub fn json<T: Serialize>(value: &T) -> Self {
         match serde_json::to_vec(value) {
             Ok(bytes) => {
@@ -77,24 +77,24 @@ impl Res {
         }
     }
 
-    /// Create response with status code.
+    /// Status response.
     pub fn status(code: u16) -> Self {
         let mut res = Response::new(Full::new(Bytes::new()));
         *res.status_mut() = StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
         Self { inner: res }
     }
 
-    /// Create response builder.
+    /// Response builder.
     pub fn builder() -> ResBuilder {
         ResBuilder::new()
     }
 
-    /// Get status code.
+    /// Get status.
     pub fn status_code(&self) -> StatusCode {
         self.inner.status()
     }
 
-    /// Add header to response.
+    /// Add header.
     #[inline]
     pub fn with_header(mut self, name: impl AsRef<str>, value: impl AsRef<str>) -> Self {
         if let (Ok(name), Ok(value)) = (
@@ -106,13 +106,13 @@ impl Res {
         self
     }
 
-    /// Get mutable access to headers.
+    /// Get headers mutable.
     #[inline]
     pub fn headers_mut(&mut self) -> &mut header::HeaderMap {
         self.inner.headers_mut()
     }
 
-    /// Get read-only access to headers.
+    /// Get headers.
     #[inline]
     pub fn headers(&self) -> &header::HeaderMap {
         self.inner.headers()
@@ -125,14 +125,14 @@ impl Default for Res {
     }
 }
 
-/// Response builder with fluent API.
+/// Response builder.
 pub struct ResBuilder {
     status: StatusCode,
     headers: Vec<(header::HeaderName, header::HeaderValue)>,
 }
 
 impl ResBuilder {
-    /// Create response builder.
+    /// New builder.
     pub fn new() -> Self {
         Self {
             status: StatusCode::OK,
@@ -140,13 +140,13 @@ impl ResBuilder {
         }
     }
 
-    /// Set HTTP status code.
+    /// Set status.
     pub fn status(mut self, code: u16) -> Self {
         self.status = StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
         self
     }
 
-    /// Add header to response.
+    /// Add header.
     pub fn header(mut self, name: impl AsRef<str>, value: impl AsRef<str>) -> Self {
         if let (Ok(name), Ok(value)) = (
             header::HeaderName::from_bytes(name.as_ref().as_bytes()),
@@ -157,7 +157,7 @@ impl ResBuilder {
         self
     }
 
-    /// Build text response.
+    /// Build text.
     pub fn text(self, body: impl Into<String>) -> Res {
         let body_str = body.into();
         let mut res = Response::new(Full::new(Bytes::from(body_str)));
@@ -181,7 +181,7 @@ impl ResBuilder {
         Res { inner: res }
     }
 
-    /// Build HTML response.
+    /// Build HTML.
     pub fn html(self, body: impl Into<String>) -> Res {
         let body_str = body.into();
         let mut res = Response::new(Full::new(Bytes::from(body_str)));
@@ -205,7 +205,7 @@ impl ResBuilder {
         Res { inner: res }
     }
 
-    /// Build JSON response.
+    /// Build JSON.
     pub fn json<T: serde::Serialize>(self, value: &T) -> Res {
         match serde_json::to_string(value) {
             Ok(body) => {

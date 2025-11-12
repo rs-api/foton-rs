@@ -1,4 +1,4 @@
-//! Application builder and server.
+//! HTTP application builder and server.
 
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -23,7 +23,7 @@ type BoxedHandler<S> = Arc<dyn Handler<S>>;
 type BoxedMiddleware<S> = Arc<dyn Middleware<S>>;
 type BoxedErrorHandler = Arc<dyn ErrorHandler>;
 
-/// Application builder and HTTP server.
+/// HTTP application with routing and middleware.
 pub struct RustApi<S = ()> {
     routes: Vec<(Method, String, BoxedHandler<S>, Vec<BoxedMiddleware<S>>)>,
     middlewares: Vec<BoxedMiddleware<S>>,
@@ -33,7 +33,7 @@ pub struct RustApi<S = ()> {
 }
 
 impl RustApi<()> {
-    /// Create application without state.
+    /// Create new application.
     pub fn new() -> Self {
         Self {
             routes: Vec::new(),
@@ -46,7 +46,7 @@ impl RustApi<()> {
 }
 
 impl<S: Send + Sync + 'static> RustApi<S> {
-    /// Create application with shared state.
+    /// Create application with state.
     pub fn with_state(state: S) -> Self {
         Self {
             routes: Vec::new(),
@@ -57,13 +57,13 @@ impl<S: Send + Sync + 'static> RustApi<S> {
         }
     }
 
-    /// Set custom error handler for transforming errors into responses.
+    /// Set error handler.
     pub fn error_handler<H: ErrorHandler>(mut self, handler: H) -> Self {
         self.error_handler = Some(Arc::new(handler));
         self
     }
 
-    /// Add global middleware that runs on all routes.
+    /// Add global middleware.
     pub fn layer<F, Fut>(mut self, middleware: F) -> Self
     where
         F: Fn(Req, Arc<S>, crate::Next<S>) -> Fut + Send + Sync + 'static,
@@ -143,14 +143,14 @@ impl<S: Send + Sync + 'static> RustApi<S> {
         self
     }
 
-    /// Register route with per-route middleware.
+    /// Register route with middleware.
     pub fn route(mut self, route: crate::Route<S>) -> Self {
         self.routes
             .push((route.method, route.path, route.handler, route.middlewares));
         self
     }
 
-    /// Mount router at path prefix.
+    /// Nest router at prefix.
     pub fn nest(mut self, prefix: &str, router: Router<S>) -> Self {
         let flattened = router.flatten(prefix);
         for (method, path, handler, middlewares) in flattened {
@@ -187,7 +187,7 @@ impl<S: Send + Sync + 'static> RustApi<S> {
         self
     }
 
-    /// Start HTTP server on address.
+    /// Start server.
     pub async fn listen(self, addr: impl Into<SocketAddr>) -> Result<()> {
         let addr = addr.into();
         let app = Arc::new(self.build_router());

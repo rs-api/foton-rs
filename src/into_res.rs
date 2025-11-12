@@ -1,13 +1,10 @@
-//! Convert types into HTTP responses
-//!
-//! The [`IntoRes`] trait allows handlers to return various types
-//! that are automatically converted to HTTP responses.
+//! Response conversion trait.
 
 use crate::{Error, Res};
 
-/// Types that can become HTTP responses
+/// Convert to response.
 pub trait IntoRes {
-    /// Convert into response
+    /// Convert to response.
     fn into_res(self) -> Res;
 }
 

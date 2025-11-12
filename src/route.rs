@@ -1,4 +1,4 @@
-//! Per-route middleware support.
+//! Per-route middleware.
 
 use hyper::Method;
 use std::sync::Arc;
