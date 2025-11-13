@@ -1,16 +1,16 @@
-//! Per-route middleware.
+//! Per-route configuration.
 
 use hyper::Method;
 use std::sync::Arc;
 
-use crate::{Handler, Middleware, handler::IntoHandler, middleware::FnMiddleware};
+use crate::{Handler, Middleware, handler::IntoHandler};
 
-/// Route with optional middleware.
+/// Route with per-route middleware.
 pub struct Route<S = ()> {
     pub(crate) method: Method,
     pub(crate) path: String,
     pub(crate) handler: Arc<dyn Handler<S>>,
-    pub(crate) middlewares: Vec<Arc<dyn Middleware<S>>>,
+    pub(crate) middlewares: Arc<Vec<Arc<dyn Middleware<S>>>>,
 }
 
 impl<S: Send + Sync + 'static> Route<S> {
@@ -19,23 +19,15 @@ impl<S: Send + Sync + 'static> Route<S> {
             method,
             path,
             handler,
-            middlewares: Vec::new(),
+            middlewares: Arc::new(Vec::new()),
         }
     }
 
-    /// Add middleware to this route.
-    pub fn layer<F, Fut>(mut self, middleware: F) -> Self
-    where
-        F: Fn(crate::Req, Arc<S>, crate::Next<S>) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future<Output = crate::Res> + Send + 'static,
-    {
-        self.middlewares.push(Arc::new(FnMiddleware(middleware)));
-        self
-    }
-
-    /// Add middleware from trait implementation.
-    pub fn layer_middleware<M: Middleware<S>>(mut self, middleware: M) -> Self {
-        self.middlewares.push(Arc::new(middleware));
+    /// Add middleware to route.
+    pub fn layer<M: Middleware<S>>(mut self, middleware: M) -> Self {
+        let mut mw = (*self.middlewares).clone();
+        mw.push(Arc::new(middleware));
+        self.middlewares = Arc::new(mw);
         self
     }
 

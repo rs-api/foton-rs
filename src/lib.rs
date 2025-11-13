@@ -1,4 +1,4 @@
-//! Fast and lightweight web framework for Rust.
+//! Fast web framework for Rust.
 //!
 //! ## Quick Start
 //!
@@ -8,12 +8,8 @@
 //! #[tokio::main]
 //! async fn main() {
 //!     let app = RustApi::new()
-//!         .get("/", |_req: Req| async {
-//!             Res::text("Hello, world!")
-//!         })
-//!         .get("/health", |_req: Req| async {
-//!             Res::text("OK")
-//!         });
+//!         .get("/", |_req: Req| async { Res::text("Hello") })
+//!         .get("/health", |_req: Req| async { Res::text("OK") });
 //!
 //!     app.listen(([127, 0, 0, 1], 3000)).await.unwrap();
 //! }
@@ -42,17 +38,17 @@ pub use extensions::Extensions;
 pub use extractors::{BodyBytes, Form, FromRequest, Headers, Json, Path, Query, State};
 pub use handler::{FnHandler, FnHandler1, FnHandler2, FnHandler3, Handler};
 pub use into_res::IntoRes;
-pub use middleware::{Middleware, Next};
+pub use middleware::{Middleware, Next, from_fn, middleware};
 pub use req::Req;
 pub use res::{Res, ResBuilder};
 pub use route::Route;
 pub use router::Router;
 
-/// Commonly used types and traits.
+/// Common types and traits.
 pub mod prelude {
     pub use crate::extractors::{BodyBytes, Form, FromRequest, Headers, Json, Path, Query, State};
     pub use crate::{
         Error, ErrorHandler, Extensions, Handler, IntoRes, Middleware, Next, Req, Res, Result,
-        Route, Router, RustApi,
+        Route, Router, RustApi, from_fn, middleware,
     };
 }

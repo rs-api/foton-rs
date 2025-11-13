@@ -2,51 +2,51 @@
 
 use std::fmt;
 
-/// Standard Result type for the framework.
+/// Result type with framework Error.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// HTTP-aware error types.
+/// HTTP error.
 #[derive(Debug)]
 pub enum Error {
-    /// HTTP status code with optional message.
+    /// HTTP status with optional message.
     Status(u16, Option<String>),
-    /// JSON serialization error.
+    /// JSON error.
     Json(String),
     /// HTTP protocol error.
     Hyper(hyper::Error),
     /// IO error.
     Io(std::io::Error),
-    /// Custom error message.
+    /// Custom error.
     Custom(String),
 }
 
 impl Error {
-    /// Create 400 Bad Request error.
+    /// Create 400 Bad Request.
     pub fn bad_request(msg: impl Into<String>) -> Self {
         Self::Status(400, Some(msg.into()))
     }
 
-    /// Create 401 Unauthorized error.
+    /// Create 401 Unauthorized.
     pub fn unauthorized(msg: impl Into<String>) -> Self {
         Self::Status(401, Some(msg.into()))
     }
 
-    /// Create 403 Forbidden error.
+    /// Create 403 Forbidden.
     pub fn forbidden(msg: impl Into<String>) -> Self {
         Self::Status(403, Some(msg.into()))
     }
 
-    /// Create 404 Not Found error.
+    /// Create 404 Not Found.
     pub fn not_found(msg: impl Into<String>) -> Self {
         Self::Status(404, Some(msg.into()))
     }
 
-    /// Create 413 Payload Too Large error.
+    /// Create 413 Payload Too Large.
     pub fn payload_too_large(msg: impl Into<String>) -> Self {
         Self::Status(413, Some(msg.into()))
     }
 
-    /// Create 422 Unprocessable Entity error.
+    /// Create 422 Unprocessable Entity.
     pub fn unprocessable(msg: impl Into<String>) -> Self {
         Self::Status(422, Some(msg.into()))
     }
@@ -56,7 +56,7 @@ impl Error {
         Self::Status(500, Some(msg.into()))
     }
 
-    /// Create custom status code error.
+    /// Create custom status code.
     pub fn status(code: u16) -> Self {
         Self::Status(code, None)
     }

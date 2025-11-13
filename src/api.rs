@@ -1,4 +1,4 @@
-//! HTTP application builder and server.
+//! HTTP application builder.
 
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -16,24 +16,25 @@ use tokio::net::TcpListener;
 
 use crate::{
     Error, ErrorHandler, Handler, IntoRes, Middleware, Req, Res, Result, Router,
-    handler::IntoHandler, middleware::FnMiddleware,
+    handler::IntoHandler,
 };
 
 type BoxedHandler<S> = Arc<dyn Handler<S>>;
 type BoxedMiddleware<S> = Arc<dyn Middleware<S>>;
+type SharedMiddlewares<S> = Arc<Vec<BoxedMiddleware<S>>>;
 type BoxedErrorHandler = Arc<dyn ErrorHandler>;
 
-/// HTTP application with routing and middleware.
+/// HTTP application.
 pub struct RustApi<S = ()> {
-    routes: Vec<(Method, String, BoxedHandler<S>, Vec<BoxedMiddleware<S>>)>,
+    routes: Vec<(Method, String, BoxedHandler<S>, SharedMiddlewares<S>)>,
     middlewares: Vec<BoxedMiddleware<S>>,
     state: Option<Arc<S>>,
-    router: Option<matchit::Router<(BoxedHandler<S>, Vec<BoxedMiddleware<S>>)>>,
+    router: Option<matchit::Router<(BoxedHandler<S>, SharedMiddlewares<S>)>>,
     error_handler: Option<BoxedErrorHandler>,
 }
 
 impl RustApi<()> {
-    /// Create new application.
+    /// Create application.
     pub fn new() -> Self {
         Self {
             routes: Vec::new(),
@@ -57,19 +58,15 @@ impl<S: Send + Sync + 'static> RustApi<S> {
         }
     }
 
-    /// Set error handler.
+    /// Set custom error handler.
     pub fn error_handler<H: ErrorHandler>(mut self, handler: H) -> Self {
         self.error_handler = Some(Arc::new(handler));
         self
     }
 
     /// Add global middleware.
-    pub fn layer<F, Fut>(mut self, middleware: F) -> Self
-    where
-        F: Fn(Req, Arc<S>, crate::Next<S>) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future<Output = crate::Res> + Send + 'static,
-    {
-        self.middlewares.push(Arc::new(FnMiddleware(middleware)));
+    pub fn layer<M: crate::Middleware<S>>(mut self, middleware: M) -> Self {
+        self.middlewares.push(Arc::new(middleware));
         self
     }
 
@@ -82,7 +79,7 @@ impl<S: Send + Sync + 'static> RustApi<S> {
             Method::GET,
             path.to_string(),
             handler.into_handler(),
-            Vec::new(),
+            Arc::new(Vec::new()),
         ));
         self
     }
@@ -96,7 +93,7 @@ impl<S: Send + Sync + 'static> RustApi<S> {
             Method::POST,
             path.to_string(),
             handler.into_handler(),
-            Vec::new(),
+            Arc::new(Vec::new()),
         ));
         self
     }
@@ -110,7 +107,7 @@ impl<S: Send + Sync + 'static> RustApi<S> {
             Method::PUT,
             path.to_string(),
             handler.into_handler(),
-            Vec::new(),
+            Arc::new(Vec::new()),
         ));
         self
     }
@@ -124,7 +121,7 @@ impl<S: Send + Sync + 'static> RustApi<S> {
             Method::DELETE,
             path.to_string(),
             handler.into_handler(),
-            Vec::new(),
+            Arc::new(Vec::new()),
         ));
         self
     }
@@ -138,19 +135,19 @@ impl<S: Send + Sync + 'static> RustApi<S> {
             Method::PATCH,
             path.to_string(),
             handler.into_handler(),
-            Vec::new(),
+            Arc::new(Vec::new()),
         ));
         self
     }
 
-    /// Register route with middleware.
+    /// Register route with per-route middleware.
     pub fn route(mut self, route: crate::Route<S>) -> Self {
         self.routes
             .push((route.method, route.path, route.handler, route.middlewares));
         self
     }
 
-    /// Nest router at prefix.
+    /// Mount router at prefix.
     pub fn nest(mut self, prefix: &str, router: Router<S>) -> Self {
         let flattened = router.flatten(prefix);
         for (method, path, handler, middlewares) in flattened {
@@ -163,12 +160,23 @@ impl<S: Send + Sync + 'static> RustApi<S> {
         let mut router = matchit::Router::new();
         let mut method_routes: HashMap<
             Method,
-            Vec<(String, BoxedHandler<S>, Vec<BoxedMiddleware<S>>)>,
+            Vec<(String, BoxedHandler<S>, SharedMiddlewares<S>)>,
         > = HashMap::new();
 
+        let global_middlewares = Arc::new(self.middlewares.clone());
+
         for (method, path, handler, route_middlewares) in self.routes.drain(..) {
-            let mut combined_middlewares = self.middlewares.clone();
-            combined_middlewares.extend(route_middlewares);
+            let combined_middlewares: SharedMiddlewares<S> = if route_middlewares.is_empty() {
+                Arc::clone(&global_middlewares)
+            } else if global_middlewares.is_empty() {
+                route_middlewares
+            } else {
+                let mut combined =
+                    Vec::with_capacity(global_middlewares.len() + route_middlewares.len());
+                combined.extend_from_slice(&global_middlewares);
+                combined.extend_from_slice(&route_middlewares);
+                Arc::new(combined)
+            };
 
             method_routes.entry(method).or_insert_with(Vec::new).push((
                 path,
@@ -187,7 +195,7 @@ impl<S: Send + Sync + 'static> RustApi<S> {
         self
     }
 
-    /// Start server.
+    /// Start HTTP server.
     pub async fn listen(self, addr: impl Into<SocketAddr>) -> Result<()> {
         let addr = addr.into();
         let app = Arc::new(self.build_router());

@@ -1,26 +1,21 @@
-//! HTTP request with lazy body consumption.
+//! HTTP request with lock-free body consumption.
 
 use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::{Method, Request, Uri, body::Incoming, header};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use tokio::sync::OnceCell;
 
 use crate::extensions::Extensions;
 use crate::{Error, Result};
 
-#[derive(Clone)]
-enum Body {
-    Streaming(Arc<Mutex<Option<Incoming>>>),
-    Consumed(Bytes),
-}
-
-/// HTTP request. Body consumed on-demand for zero-copy optimization.
+/// HTTP request.
 pub struct Req {
     method: Method,
     uri: Uri,
     headers: header::HeaderMap,
-    body: Body,
+    body_cell: OnceCell<Bytes>,
+    incoming: Option<Incoming>,
     path_params: HashMap<String, String>,
     extensions: Extensions,
 }
@@ -34,7 +29,8 @@ impl Req {
             method: parts.method,
             uri: parts.uri,
             headers: parts.headers,
-            body: Body::Streaming(Arc::new(Mutex::new(Some(body)))),
+            body_cell: OnceCell::new(),
+            incoming: Some(body),
             path_params: HashMap::new(),
             extensions: Extensions::new(),
         }
@@ -64,19 +60,25 @@ impl Req {
         self.uri.query()
     }
 
-    /// Get header value by name.
+    /// Get header value.
     #[inline]
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers.get(name).and_then(|v| v.to_str().ok())
     }
 
-    /// Get all headers.
+    /// Get headers.
     #[inline]
     pub fn headers(&self) -> &header::HeaderMap {
         &self.headers
     }
 
-    /// Get path parameter by name.
+    /// Get mutable headers.
+    #[inline]
+    pub fn headers_mut(&mut self) -> &mut header::HeaderMap {
+        &mut self.headers
+    }
+
+    /// Get path parameter.
     #[inline]
     pub fn param(&self, name: &str) -> Option<&str> {
         self.path_params.get(name).map(|s| s.as_str())
@@ -88,46 +90,29 @@ impl Req {
         &self.path_params
     }
 
-    /// Get path parameters for extractors.
+    /// Get path parameters (for extractors).
     #[inline]
     pub fn path_params(&self) -> &HashMap<String, String> {
         &self.path_params
     }
 
-    /// Consume body as bytes. Called lazily by extractors.
+    /// Consume body as bytes (cached on first call).
     pub async fn body(&mut self) -> Result<&Bytes> {
-        match &self.body {
-            Body::Consumed(_) => {
-                // Already consumed, return cached bytes
-                if let Body::Consumed(ref bytes) = self.body {
-                    Ok(bytes)
-                } else {
-                    unreachable!()
-                }
-            }
-            Body::Streaming(incoming) => {
-                // Consume streaming body on-demand
-                let body_opt = incoming.lock().unwrap().take();
+        self.body_cell
+            .get_or_try_init(|| async {
+                let incoming = self
+                    .incoming
+                    .take()
+                    .ok_or_else(|| Error::internal("Request body already consumed"))?;
 
-                if let Some(incoming_body) = body_opt {
-                    let collected = incoming_body
-                        .collect()
-                        .await
-                        .map_err(|e| Error::Custom(format!("Failed to read body: {}", e)))?;
+                let collected = incoming
+                    .collect()
+                    .await
+                    .map_err(|e| Error::Custom(format!("Failed to read body: {}", e)))?;
 
-                    let bytes = collected.to_bytes();
-                    self.body = Body::Consumed(bytes.clone());
-
-                    if let Body::Consumed(ref bytes) = self.body {
-                        Ok(bytes)
-                    } else {
-                        unreachable!()
-                    }
-                } else {
-                    Err(Error::internal("Request body already consumed"))
-                }
-            }
-        }
+                Ok(collected.to_bytes())
+            })
+            .await
     }
 
     /// Get Content-Type header.
@@ -150,7 +135,7 @@ impl Req {
         &self.extensions
     }
 
-    /// Get mutable request extensions.
+    /// Get mutable extensions.
     #[inline]
     pub fn extensions_mut(&mut self) -> &mut Extensions {
         &mut self.extensions

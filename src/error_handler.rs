@@ -2,8 +2,8 @@
 
 use crate::{Error, Res};
 
-/// Convert errors to responses.
+/// Convert errors to HTTP responses.
 pub trait ErrorHandler: Send + Sync + 'static {
-    /// Handle error.
+    /// Handle error and return response.
     fn handle(&self, error: Error) -> Res;
 }

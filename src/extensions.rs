@@ -1,52 +1,33 @@
-//! Request extensions for storing arbitrary data
-//!
-//! Extensions allow middleware to attach data to requests that can be
-//! retrieved by handlers or other middleware downstream.
+//! Type-safe request storage.
 
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
-/// A type map for storing request-scoped data
-///
-/// Extensions allow you to store arbitrary data that can be accessed
-/// by type throughout the request lifecycle.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use rust_api::prelude::*;
-///
-/// #[derive(Clone)]
-/// struct User {
-///     id: u64,
-///     name: String,
-/// }
-///
-/// // In middleware
-/// let user = User { id: 1, name: "Alice".into() };
-/// req.extensions_mut().insert(user);
-///
-/// // In handler
-/// if let Some(user) = req.extensions().get::<User>() {
-///     println!("User: {}", user.name);
-/// }
-/// ```
+/// Store arbitrary data by type.
 #[derive(Default)]
 pub struct Extensions {
     map: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl Extensions {
-    /// Create a new empty Extensions
+    /// Create with pre-allocated capacity (4).
+    #[inline]
     pub fn new() -> Self {
         Self {
-            map: HashMap::new(),
+            map: HashMap::with_capacity(4),
         }
     }
 
-    /// Insert a value into the extensions
-    ///
-    /// If a value of this type already exists, it will be replaced and returned.
+    /// Create with custom capacity.
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            map: HashMap::with_capacity(capacity),
+        }
+    }
+
+    /// Insert value (replaces existing).
+    #[inline]
     pub fn insert<T: Send + Sync + 'static>(&mut self, value: T) -> Option<T> {
         self.map
             .insert(TypeId::of::<T>(), Box::new(value))
@@ -54,21 +35,24 @@ impl Extensions {
             .map(|boxed| *boxed)
     }
 
-    /// Get a reference to a value in the extensions
+    /// Get reference to value.
+    #[inline]
     pub fn get<T: Send + Sync + 'static>(&self) -> Option<&T> {
         self.map
             .get(&TypeId::of::<T>())
             .and_then(|boxed| boxed.downcast_ref::<T>())
     }
 
-    /// Get a mutable reference to a value in the extensions
+    /// Get mutable reference to value.
+    #[inline]
     pub fn get_mut<T: Send + Sync + 'static>(&mut self) -> Option<&mut T> {
         self.map
             .get_mut(&TypeId::of::<T>())
             .and_then(|boxed| boxed.downcast_mut::<T>())
     }
 
-    /// Remove a value from the extensions
+    /// Remove value.
+    #[inline]
     pub fn remove<T: Send + Sync + 'static>(&mut self) -> Option<T> {
         self.map
             .remove(&TypeId::of::<T>())
@@ -76,14 +60,28 @@ impl Extensions {
             .map(|boxed| *boxed)
     }
 
-    /// Check if a value of type T exists in the extensions
+    /// Check if value exists.
+    #[inline]
     pub fn contains<T: Send + Sync + 'static>(&self) -> bool {
         self.map.contains_key(&TypeId::of::<T>())
     }
 
-    /// Clear all extensions
+    /// Clear all values.
+    #[inline]
     pub fn clear(&mut self) {
         self.map.clear();
+    }
+
+    /// Get count.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    /// Check if empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
     }
 }
 
@@ -92,5 +90,44 @@ impl std::fmt::Debug for Extensions {
         f.debug_struct("Extensions")
             .field("count", &self.map.len())
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_insert_and_get() {
+        let mut ext = Extensions::new();
+        ext.insert(42u32);
+        ext.insert("hello".to_string());
+
+        assert_eq!(ext.get::<u32>(), Some(&42));
+        assert_eq!(ext.get::<String>().map(|s| s.as_str()), Some("hello"));
+    }
+
+    #[test]
+    fn test_capacity() {
+        let ext = Extensions::with_capacity(10);
+        assert!(ext.map.capacity() >= 10);
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut ext = Extensions::new();
+        ext.insert(100u64);
+
+        assert_eq!(ext.remove::<u64>(), Some(100));
+        assert_eq!(ext.get::<u64>(), None);
+    }
+
+    #[test]
+    fn test_contains() {
+        let mut ext = Extensions::new();
+        ext.insert(true);
+
+        assert!(ext.contains::<bool>());
+        assert!(!ext.contains::<u32>());
     }
 }

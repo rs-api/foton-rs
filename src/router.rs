@@ -1,14 +1,15 @@
-//! Router nesting.
+//! Router nesting with shared middleware.
 
 use hyper::Method;
 use std::sync::Arc;
 
-use crate::{Handler, Middleware, handler::IntoHandler, middleware::FnMiddleware};
+use crate::{Handler, Middleware, handler::IntoHandler};
 
 type BoxedHandler<S> = Arc<dyn Handler<S>>;
 type BoxedMiddleware<S> = Arc<dyn Middleware<S>>;
+type SharedMiddlewares<S> = Arc<Vec<BoxedMiddleware<S>>>;
 
-/// Router for grouping and nesting routes.
+/// Route grouping and nesting.
 pub struct Router<S = ()> {
     routes: Vec<(Method, String, BoxedHandler<S>)>,
     middlewares: Vec<BoxedMiddleware<S>>,
@@ -16,13 +17,18 @@ pub struct Router<S = ()> {
 }
 
 impl<S: Send + Sync + 'static> Router<S> {
-    /// Create router.
-    pub fn new() -> Self {
+    /// Create with pre-allocated capacity.
+    pub fn with_capacity(routes: usize, middlewares: usize) -> Self {
         Self {
-            routes: Vec::new(),
-            middlewares: Vec::new(),
+            routes: Vec::with_capacity(routes),
+            middlewares: Vec::with_capacity(middlewares),
             nested: Vec::new(),
         }
+    }
+
+    /// Create router.
+    pub fn new() -> Self {
+        Self::with_capacity(10, 5)
     }
 
     /// Register GET route.
@@ -75,17 +81,13 @@ impl<S: Send + Sync + 'static> Router<S> {
         self
     }
 
-    /// Add middleware to all routes in this router.
-    pub fn layer<F, Fut>(mut self, middleware: F) -> Self
-    where
-        F: Fn(crate::Req, Arc<S>, crate::Next<S>) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future<Output = crate::Res> + Send + 'static,
-    {
-        self.middlewares.push(Arc::new(FnMiddleware(middleware)));
+    /// Add middleware to router.
+    pub fn layer<M: crate::Middleware<S>>(mut self, middleware: M) -> Self {
+        self.middlewares.push(Arc::new(middleware));
         self
     }
 
-    /// Nest router at path prefix.
+    /// Mount nested router at prefix.
     pub fn nest(mut self, prefix: &str, router: Router<S>) -> Self {
         self.nested.push((prefix.to_string(), router));
         self
@@ -94,29 +96,64 @@ impl<S: Send + Sync + 'static> Router<S> {
     pub(crate) fn flatten(
         &self,
         prefix: &str,
-    ) -> Vec<(Method, String, BoxedHandler<S>, Vec<BoxedMiddleware<S>>)> {
-        let mut flattened = Vec::new();
+    ) -> Vec<(Method, String, BoxedHandler<S>, SharedMiddlewares<S>)> {
+        self.flatten_with_shared("", prefix, None)
+    }
+
+    fn flatten_with_shared(
+        &self,
+        base_prefix: &str,
+        prefix: &str,
+        parent_middlewares: Option<&SharedMiddlewares<S>>,
+    ) -> Vec<(Method, String, BoxedHandler<S>, SharedMiddlewares<S>)> {
+        let estimated_size = self.routes.len()
+            + self
+                .nested
+                .iter()
+                .map(|(_, r)| r.routes.len())
+                .sum::<usize>();
+        let mut flattened = Vec::with_capacity(estimated_size);
+
+        let combined_middlewares: SharedMiddlewares<S> = if let Some(parent) = parent_middlewares {
+            if self.middlewares.is_empty() {
+                Arc::clone(parent)
+            } else {
+                let mut combined = Vec::with_capacity(parent.len() + self.middlewares.len());
+                combined.extend_from_slice(parent);
+                combined.extend_from_slice(&self.middlewares);
+                Arc::new(combined)
+            }
+        } else {
+            Arc::new(self.middlewares.clone())
+        };
 
         for (method, path, handler) in &self.routes {
-            let full_path = format!("{}{}", prefix, path);
+            let full_path = if prefix.is_empty() {
+                path.clone()
+            } else {
+                format!("{}{}", prefix, path)
+            };
+
             flattened.push((
                 method.clone(),
                 full_path,
                 Arc::clone(handler),
-                self.middlewares.clone(),
+                Arc::clone(&combined_middlewares),
             ));
         }
 
         for (nested_prefix, nested_router) in &self.nested {
-            let full_prefix = format!("{}{}", prefix, nested_prefix);
-            let mut nested_routes = nested_router.flatten(&full_prefix);
+            let full_prefix = if prefix.is_empty() {
+                nested_prefix.clone()
+            } else {
+                format!("{}{}", prefix, nested_prefix)
+            };
 
-            for (_, _, _, middlewares) in &mut nested_routes {
-                let mut combined = self.middlewares.clone();
-                combined.append(middlewares);
-                *middlewares = combined;
-            }
-
+            let nested_routes = nested_router.flatten_with_shared(
+                base_prefix,
+                &full_prefix,
+                Some(&combined_middlewares),
+            );
             flattened.extend(nested_routes);
         }
 

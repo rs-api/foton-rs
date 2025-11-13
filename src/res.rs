@@ -1,9 +1,16 @@
-//! HTTP response.
+//! HTTP response with optimized serialization.
 
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{Response, StatusCode, header};
 use serde::Serialize;
+
+static CONTENT_TYPE_TEXT: header::HeaderValue =
+    header::HeaderValue::from_static("text/plain; charset=utf-8");
+static CONTENT_TYPE_HTML: header::HeaderValue =
+    header::HeaderValue::from_static("text/html; charset=utf-8");
+static CONTENT_TYPE_JSON: header::HeaderValue =
+    header::HeaderValue::from_static("application/json");
 
 /// HTTP response.
 pub struct Res {
@@ -35,10 +42,8 @@ impl Res {
     pub fn text(body: impl Into<String>) -> Self {
         let body_str = body.into();
         let mut res = Response::new(Full::new(Bytes::from(body_str)));
-        res.headers_mut().insert(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_static("text/plain; charset=utf-8"),
-        );
+        res.headers_mut()
+            .insert(header::CONTENT_TYPE, CONTENT_TYPE_TEXT.clone());
         Self { inner: res }
     }
 
@@ -46,50 +51,44 @@ impl Res {
     pub fn html(body: impl Into<String>) -> Self {
         let body_str = body.into();
         let mut res = Response::new(Full::new(Bytes::from(body_str)));
-        res.headers_mut().insert(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_static("text/html; charset=utf-8"),
-        );
+        res.headers_mut()
+            .insert(header::CONTENT_TYPE, CONTENT_TYPE_HTML.clone());
         Self { inner: res }
     }
 
-    /// JSON response.
+    /// JSON response (serializes to Vec<u8> directly).
     pub fn json<T: Serialize>(value: &T) -> Self {
         match serde_json::to_vec(value) {
             Ok(bytes) => {
                 let mut res = Response::new(Full::new(Bytes::from(bytes)));
-                res.headers_mut().insert(
-                    header::CONTENT_TYPE,
-                    header::HeaderValue::from_static("application/json"),
-                );
+                res.headers_mut()
+                    .insert(header::CONTENT_TYPE, CONTENT_TYPE_JSON.clone());
                 Self { inner: res }
             }
             Err(e) => {
                 let error_msg = format!(r#"{{"error": "JSON serialization failed: {}"}}"#, e);
                 let mut res = Response::new(Full::new(Bytes::from(error_msg)));
                 *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
-                res.headers_mut().insert(
-                    header::CONTENT_TYPE,
-                    header::HeaderValue::from_static("application/json"),
-                );
+                res.headers_mut()
+                    .insert(header::CONTENT_TYPE, CONTENT_TYPE_JSON.clone());
                 Self { inner: res }
             }
         }
     }
 
-    /// Status response.
+    /// Status-only response.
     pub fn status(code: u16) -> Self {
         let mut res = Response::new(Full::new(Bytes::new()));
         *res.status_mut() = StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
         Self { inner: res }
     }
 
-    /// Response builder.
+    /// Create builder.
     pub fn builder() -> ResBuilder {
         ResBuilder::new()
     }
 
-    /// Get status.
+    /// Get status code.
     pub fn status_code(&self) -> StatusCode {
         self.inner.status()
     }
@@ -106,7 +105,7 @@ impl Res {
         self
     }
 
-    /// Get headers mutable.
+    /// Get mutable headers.
     #[inline]
     pub fn headers_mut(&mut self) -> &mut header::HeaderMap {
         self.inner.headers_mut()
@@ -125,22 +124,22 @@ impl Default for Res {
     }
 }
 
-/// Response builder.
+/// Response builder with pre-allocated headers.
 pub struct ResBuilder {
     status: StatusCode,
-    headers: Vec<(header::HeaderName, header::HeaderValue)>,
+    headers: header::HeaderMap,
 }
 
 impl ResBuilder {
-    /// New builder.
+    /// Create builder.
     pub fn new() -> Self {
         Self {
             status: StatusCode::OK,
-            headers: Vec::new(),
+            headers: header::HeaderMap::with_capacity(4),
         }
     }
 
-    /// Set status.
+    /// Set status code.
     pub fn status(mut self, code: u16) -> Self {
         self.status = StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
         self
@@ -152,85 +151,66 @@ impl ResBuilder {
             header::HeaderName::from_bytes(name.as_ref().as_bytes()),
             header::HeaderValue::from_str(value.as_ref()),
         ) {
-            self.headers.push((name, value));
+            self.headers.insert(name, value);
         }
         self
     }
 
-    /// Build text.
-    pub fn text(self, body: impl Into<String>) -> Res {
+    /// Build text response.
+    pub fn text(mut self, body: impl Into<String>) -> Res {
         let body_str = body.into();
         let mut res = Response::new(Full::new(Bytes::from(body_str)));
         *res.status_mut() = self.status;
 
-        let has_content_type = self
-            .headers
-            .iter()
-            .any(|(name, _)| name == header::CONTENT_TYPE);
-        if !has_content_type {
-            res.headers_mut().insert(
-                header::CONTENT_TYPE,
-                header::HeaderValue::from_static("text/plain; charset=utf-8"),
-            );
+        if !self.headers.contains_key(header::CONTENT_TYPE) {
+            self.headers
+                .insert(header::CONTENT_TYPE, CONTENT_TYPE_TEXT.clone());
         }
 
-        for (name, value) in self.headers {
-            res.headers_mut().insert(name, value);
-        }
-
+        *res.headers_mut() = self.headers;
         Res { inner: res }
     }
 
-    /// Build HTML.
-    pub fn html(self, body: impl Into<String>) -> Res {
+    /// Build HTML response.
+    pub fn html(mut self, body: impl Into<String>) -> Res {
         let body_str = body.into();
         let mut res = Response::new(Full::new(Bytes::from(body_str)));
         *res.status_mut() = self.status;
 
-        let has_content_type = self
-            .headers
-            .iter()
-            .any(|(name, _)| name == header::CONTENT_TYPE);
-        if !has_content_type {
-            res.headers_mut().insert(
-                header::CONTENT_TYPE,
-                header::HeaderValue::from_static("text/html; charset=utf-8"),
-            );
+        if !self.headers.contains_key(header::CONTENT_TYPE) {
+            self.headers
+                .insert(header::CONTENT_TYPE, CONTENT_TYPE_HTML.clone());
         }
 
-        for (name, value) in self.headers {
-            res.headers_mut().insert(name, value);
-        }
-
+        *res.headers_mut() = self.headers;
         Res { inner: res }
     }
 
-    /// Build JSON.
-    pub fn json<T: serde::Serialize>(self, value: &T) -> Res {
-        match serde_json::to_string(value) {
-            Ok(body) => {
-                let mut res = Response::new(Full::new(Bytes::from(body)));
+    /// Build JSON response.
+    pub fn json<T: Serialize>(mut self, value: &T) -> Res {
+        match serde_json::to_vec(value) {
+            Ok(bytes) => {
+                let mut res = Response::new(Full::new(Bytes::from(bytes)));
                 *res.status_mut() = self.status;
 
-                let has_content_type = self
-                    .headers
-                    .iter()
-                    .any(|(name, _)| name == header::CONTENT_TYPE);
-                if !has_content_type {
-                    res.headers_mut().insert(
-                        header::CONTENT_TYPE,
-                        header::HeaderValue::from_static("application/json"),
-                    );
+                if !self.headers.contains_key(header::CONTENT_TYPE) {
+                    self.headers
+                        .insert(header::CONTENT_TYPE, CONTENT_TYPE_JSON.clone());
                 }
 
-                for (name, value) in self.headers {
-                    res.headers_mut().insert(name, value);
-                }
-
+                *res.headers_mut() = self.headers;
                 Res { inner: res }
             }
             Err(_) => Res::builder().status(500).text("Failed to serialize JSON"),
         }
+    }
+
+    /// Build with custom body.
+    pub fn body(self, bytes: impl Into<Bytes>) -> Res {
+        let mut res = Response::new(Full::new(bytes.into()));
+        *res.status_mut() = self.status;
+        *res.headers_mut() = self.headers;
+        Res { inner: res }
     }
 }
 

@@ -3,6 +3,7 @@
 use crate::{Error, Req, Result};
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Extract data from request.
@@ -20,6 +21,7 @@ impl<S> FromRequest<S> for State<S>
 where
     S: Clone + Send + Sync + 'static,
 {
+    #[inline]
     async fn from_request(_req: &mut Req, state: &Arc<S>) -> Result<Self> {
         Ok(State((**state).clone()))
     }
@@ -34,6 +36,7 @@ where
     T: DeserializeOwned,
     S: Send + Sync + 'static,
 {
+    #[inline]
     async fn from_request(req: &mut Req, _state: &Arc<S>) -> Result<Self> {
         let query = req
             .uri()
@@ -77,7 +80,7 @@ where
     }
 }
 
-/// JSON extractor.
+/// JSON request body extractor.
 pub struct Json<T>(pub T);
 
 #[async_trait]
@@ -105,7 +108,7 @@ where
     }
 }
 
-/// Path parameters extractor.
+/// Path parameters extractor (deserializes HashMap directly).
 pub struct Path<T>(pub T);
 
 #[async_trait]
@@ -114,18 +117,27 @@ where
     T: DeserializeOwned,
     S: Send + Sync + 'static,
 {
+    #[inline]
     async fn from_request(req: &mut Req, _state: &Arc<S>) -> Result<Self> {
         let params = req.path_params();
-
-        let json_str = serde_json::to_string(params).map_err(|e| {
-            Error::bad_request(format!("Failed to serialize path parameters: {}", e))
+        let value = deserialize_path_params(params).map_err(|e| {
+            Error::bad_request(format!(
+                "Invalid path parameters: {}. Use String type for path segments",
+                e
+            ))
         })?;
-
-        let value = serde_json::from_str::<T>(&json_str)
-            .map_err(|e| Error::bad_request(format!("Invalid path parameters: {}. Path parameters are strings, use String type or implement custom deserializer", e)))?;
 
         Ok(Path(value))
     }
+}
+
+/// Deserialize HashMap<String, String> directly to T.
+fn deserialize_path_params<T: DeserializeOwned>(
+    params: &HashMap<String, String>,
+) -> std::result::Result<T, serde::de::value::Error> {
+    use serde::de::value::MapDeserializer;
+    let deserializer = MapDeserializer::new(params.iter().map(|(k, v)| (k.as_str(), v.as_str())));
+    T::deserialize(deserializer)
 }
 
 /// Headers extractor.
@@ -136,6 +148,7 @@ impl<S> FromRequest<S> for Headers
 where
     S: Send + Sync + 'static,
 {
+    #[inline]
     async fn from_request(req: &mut Req, _state: &Arc<S>) -> Result<Self> {
         Ok(Headers(req.headers().clone()))
     }
@@ -149,8 +162,46 @@ impl<S> FromRequest<S> for BodyBytes
 where
     S: Send + Sync + 'static,
 {
+    #[inline]
     async fn from_request(req: &mut Req, _state: &Arc<S>) -> Result<Self> {
         let body = req.body().await?;
         Ok(BodyBytes(body.clone()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_path_deserialize() {
+        #[derive(serde::Deserialize, Debug, PartialEq)]
+        struct Params {
+            id: String,
+            name: String,
+        }
+
+        let mut map = HashMap::new();
+        map.insert("id".to_string(), "123".to_string());
+        map.insert("name".to_string(), "alice".to_string());
+
+        let result: Params = deserialize_path_params(&map).unwrap();
+        assert_eq!(result.id, "123");
+        assert_eq!(result.name, "alice");
+    }
+
+    #[test]
+    fn test_path_deserialize_numbers() {
+        #[derive(serde::Deserialize, Debug, PartialEq)]
+        struct Params {
+            id: String,
+        }
+
+        let mut map = HashMap::new();
+        map.insert("id".to_string(), "456".to_string());
+
+        let result: Params = deserialize_path_params(&map).unwrap();
+        assert_eq!(result.id, "456");
     }
 }

@@ -5,12 +5,12 @@ use serde_json::json;
 async fn main() {
     let app = RustApi::new()
         // Global middleware - runs on ALL routes
-        .layer(|req, _state, next| async move {
+        .layer(from_fn(|req, _state, next| async move {
             println!("[Global] Request to: {}", req.path());
             let res = next.run(req).await;
             println!("[Global] Response status: {}", res.status_code());
             res
-        })
+        }))
         // Public routes - no additional middleware
         .get("/", |_req: Req| async {
             Res::text("Welcome! This is a public route.")
@@ -23,7 +23,7 @@ async fn main() {
             Route::get("/admin", |_req: Req| async {
                 Res::text("Admin panel - you made it past auth!")
             })
-            .layer(|req, _state, next| async move {
+            .layer(from_fn(|req, _state, next| async move {
                 println!("[Auth] Checking authorization for /admin");
 
                 // Check for auth header
@@ -43,7 +43,7 @@ async fn main() {
                         .status(401)
                         .text("Unauthorized: Missing authorization header")
                 }
-            }),
+            })),
         )
         // API route with rate limiting and validation
         .route(
@@ -51,14 +51,14 @@ async fn main() {
                 Res::text("Data created successfully!")
             })
             // Rate limiting middleware
-            .layer(|req, _state, next| async move {
+            .layer(from_fn(|req, _state, next| async move {
                 println!("[RateLimit] Checking rate limit");
                 // In a real app, you'd check Redis or in-memory store
                 println!("[RateLimit] ✓ Within limit");
                 next.run(req).await
-            })
+            }))
             // Validation middleware
-            .layer(|req, _state, next| async move {
+            .layer(from_fn(|req, _state, next| async move {
                 println!("[Validation] Checking request");
 
                 // Check content-type
@@ -78,7 +78,7 @@ async fn main() {
                         .status(400)
                         .text("Bad Request: Missing Content-Type header")
                 }
-            }),
+            })),
         )
         // Protected API with auth + logging
         .route(
@@ -88,7 +88,7 @@ async fn main() {
                 });
                 Res::json(&users)
             })
-            .layer(|req, _state, next| async move {
+            .layer(from_fn(|req, _state, next| async move {
                 println!("[Auth] Checking API access");
                 if req.header("authorization").is_some() {
                     println!("[Auth] ✓ API access granted");
@@ -99,13 +99,13 @@ async fn main() {
                         .status(401)
                         .text("Unauthorized: API key required")
                 }
-            })
-            .layer(|req, _state, next| async move {
+            }))
+            .layer(from_fn(|req, _state, next| async move {
                 println!("[Logging] API call from IP: [simulated]");
                 let res = next.run(req).await;
                 println!("[Logging] API response: {}", res.status_code());
                 res
-            }),
+            })),
         )
         // Health check - global middleware only
         .get("/health", |_req: Req| async { Res::text("OK") });

@@ -1,4 +1,4 @@
-//! Middleware system.
+//! Trait-based middleware.
 
 use async_trait::async_trait;
 use std::future::Future;
@@ -6,14 +6,14 @@ use std::sync::Arc;
 
 use crate::{Req, Res};
 
-/// Middleware trait.
+/// Middleware trait for request interception.
 #[async_trait]
 pub trait Middleware<S = ()>: Send + Sync + 'static {
-    /// Handle request.
+    /// Handle request before passing to next middleware/handler.
     async fn handle(&self, req: Req, state: Arc<S>, next: Next<S>) -> Res;
 }
 
-/// Next handler in chain.
+/// Next middleware/handler in chain.
 pub struct Next<S = ()> {
     pub(crate) handler: Arc<dyn Fn(Req, Arc<S>) -> BoxFuture<Res> + Send + Sync>,
     pub(crate) state: Arc<S>,
@@ -22,7 +22,7 @@ pub struct Next<S = ()> {
 type BoxFuture<T> = std::pin::Pin<Box<dyn Future<Output = T> + Send>>;
 
 impl<S: 'static> Next<S> {
-    /// New next handler.
+    /// Create next handler.
     #[inline]
     pub fn new(
         handler: Arc<dyn Fn(Req, Arc<S>) -> BoxFuture<Res> + Send + Sync>,
@@ -51,4 +51,34 @@ where
     async fn handle(&self, req: Req, state: Arc<S>, next: Next<S>) -> Res {
         (self.0)(req, state, next).await
     }
+}
+
+/// Create middleware from function.
+///
+/// ```rust
+/// use rust_api::{from_fn, Req, Res, Next};
+/// use std::sync::Arc;
+///
+/// let logging = from_fn(|req: Req, _state: Arc<()>, next: Next<()>| async move {
+///     println!("{} {}", req.method(), req.uri());
+///     next.run(req).await
+/// });
+/// ```
+pub fn from_fn<F, Fut, S>(f: F) -> FnMiddleware<F>
+where
+    F: Fn(Req, Arc<S>, Next<S>) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Res> + Send + 'static,
+    S: Send + Sync + 'static,
+{
+    FnMiddleware(f)
+}
+
+/// Alias for `from_fn`.
+pub fn middleware<F, Fut, S>(f: F) -> FnMiddleware<F>
+where
+    F: Fn(Req, Arc<S>, Next<S>) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Res> + Send + 'static,
+    S: Send + Sync + 'static,
+{
+    from_fn(f)
 }

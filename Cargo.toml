@@ -7,7 +7,6 @@ members = [
     "examples/form-handling",
     "examples/file-serving",
     "examples/middleware-test",
-    "examples/middleware-composition",
     "examples/extensions-demo",
     "examples/error-handlers",
     "examples/per-route-middleware",
@@ -53,13 +52,15 @@ http-body-util = "0.1"
 matchit = "0.9"
 
 # Extractors and JSON
-serde = "1"
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_urlencoded = "0.7"
 
 # Utilities
 bytes = "1"
 async-trait = "0.1"
+uuid = { version = "1", features = ["v4"] }
+paste = "1"
 
 [dev-dependencies]
 anyhow = "1"
