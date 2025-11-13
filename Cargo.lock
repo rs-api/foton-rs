@@ -76,16 +76,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
-name = "cors-demo"
-version = "0.0.1"
-dependencies = [
- "rust-api 0.0.2",
- "rust-api-cors",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -105,7 +95,7 @@ dependencies = [
 name = "error-handlers"
 version = "0.0.1"
 dependencies = [
- "rust-api 0.0.2",
+ "rust-api",
  "tokio",
 ]
 
@@ -113,7 +103,7 @@ dependencies = [
 name = "extensions-demo"
 version = "0.0.1"
 dependencies = [
- "rust-api 0.0.2",
+ "rust-api",
  "tokio",
 ]
 
@@ -121,7 +111,7 @@ dependencies = [
 name = "extractors-demo"
 version = "0.0.1"
 dependencies = [
- "rust-api 0.0.2",
+ "rust-api",
  "serde",
  "serde_json",
  "tokio",
@@ -132,20 +122,6 @@ name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
-
-[[package]]
-name = "file-serving"
-version = "0.0.1"
-dependencies = [
- "bytes",
- "futures-util",
- "http-body-util",
- "hyper",
- "rust-api 0.0.2",
- "serde_json",
- "tokio",
- "tokio-util",
-]
 
 [[package]]
 name = "find-msvc-tools"
@@ -178,7 +154,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 name = "form-handling"
 version = "0.0.1"
 dependencies = [
- "rust-api 0.0.2",
+ "rust-api",
  "serde",
  "serde_json",
  "tokio",
@@ -286,7 +262,7 @@ checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
 name = "hello-world"
 version = "0.0.1"
 dependencies = [
- "rust-api 0.0.2",
+ "rust-api",
  "serde_json",
  "tokio",
 ]
@@ -444,7 +420,7 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 name = "middleware-test"
 version = "0.0.1"
 dependencies = [
- "rust-api 0.0.2",
+ "rust-api",
  "tokio",
 ]
 
@@ -480,7 +456,7 @@ dependencies = [
 name = "nested-routing"
 version = "0.0.1"
 dependencies = [
- "rust-api 0.0.2",
+ "rust-api",
  "serde_json",
  "tokio",
 ]
@@ -568,7 +544,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 name = "per-route-middleware"
 version = "0.0.1"
 dependencies = [
- "rust-api 0.0.2",
+ "rust-api",
  "serde_json",
  "tokio",
 ]
@@ -632,7 +608,7 @@ dependencies = [
 
 [[package]]
 name = "rust-api"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -652,24 +628,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-api"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8725d7606914525ccd0a531c7c0a04324175b0df2d392efecba2f02b66eadc6a"
-dependencies = [
- "async-trait",
- "bytes",
- "http-body-util",
- "hyper",
- "hyper-util",
- "matchit",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "tokio",
-]
-
-[[package]]
 name = "rust-api-client"
 version = "0.0.1"
 dependencies = [
@@ -682,14 +640,6 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-native-tls",
-]
-
-[[package]]
-name = "rust-api-cors"
-version = "0.0.1"
-dependencies = [
- "async-trait",
- "rust-api 0.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -851,7 +801,7 @@ dependencies = [
 name = "state-management"
 version = "0.0.1"
 dependencies = [
- "rust-api 0.0.2",
+ "rust-api",
  "serde",
  "serde_json",
  "tokio",

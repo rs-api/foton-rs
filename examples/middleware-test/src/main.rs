@@ -14,27 +14,19 @@ async fn main() {
     };
 
     let app = RustApi::with_state(state)
-        .layer(|req, state, next| async move {
+        .layer(from_fn(|req: Req, state: Arc<AppState>, next| async move {
             let count = state.counter.fetch_add(1, Ordering::SeqCst) + 1;
-            println!("Middleware 1: Before handler (Request #{})", count);
-            let res = next.run(req).await;
-            println!("Middleware 1: After handler");
-            res
-        })
-        .layer(|req, state, next| async move {
+            println!("Middleware 1: Request #{}", count);
+            next.run(req).await
+        }))
+        .layer(from_fn(|req: Req, state: Arc<AppState>, next| async move {
             let count = state.counter.load(Ordering::SeqCst);
-            println!("Middleware 2: Before handler (Counter: {})", count);
-            let res = next.run(req).await;
-            println!("Middleware 2: After handler");
-            res
-        })
+            println!("Middleware 2: Counter at {}", count);
+            next.run(req).await
+        }))
         .get("/", |State(state): State<AppState>| async move {
             let count = state.counter.load(Ordering::SeqCst);
-            println!("Handler: Processing request #{}", count);
-            Res::text(format!(
-                "Hello with middleware and state! Request #{}",
-                count
-            ))
+            Res::text(format!("Request #{}", count))
         });
 
     app.listen(([127, 0, 0, 1], 3005)).await.unwrap();

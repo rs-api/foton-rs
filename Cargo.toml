@@ -5,20 +5,18 @@ members = [
     "examples/state-management",
     "examples/nested-routing",
     "examples/form-handling",
-    "examples/file-serving",
     "examples/middleware-test",
     "examples/extensions-demo",
     "examples/error-handlers",
     "examples/per-route-middleware",
     "examples/extractors-demo",
-    "examples/cors-demo",
     "rust-api-middleware/client",
 ]
 resolver = "2"
 
 [package]
 name = "rust-api"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2024"
 authors = ["Eric Kweyunga <maverickweyunga@gmail.com>"]
 description = "Fast and scalable web framework for Rust"
