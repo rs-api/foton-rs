@@ -41,7 +41,7 @@ pub use handler::{FnHandler, FnHandler1, FnHandler2, FnHandler3, Handler};
 pub use into_res::IntoRes;
 pub use middleware::{Middleware, Next, from_fn, middleware};
 pub use req::Req;
-pub use res::{Res, ResBuilder};
+pub use res::{Res, ResBuilder, StreamSender};
 pub use route::Route;
 pub use router::Router;
 

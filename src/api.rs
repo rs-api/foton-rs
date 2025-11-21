@@ -7,8 +7,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use bytes::Bytes;
-use http_body_util::Full;
+use crate::res::BoxBody;
 use hyper::body::Incoming;
 use hyper::server::conn::{http1, http2};
 use hyper::service::service_fn;
@@ -373,7 +372,7 @@ impl<S: Send + Sync + 'static> RustApi<S> {
     async fn handle_request(
         &self,
         req: Request<Incoming>,
-    ) -> std::result::Result<Response<Full<Bytes>>, Infallible> {
+    ) -> std::result::Result<Response<BoxBody>, Infallible> {
         let path = req.uri().path().to_string();
         let method = req.method().clone();
         let mut rust_req = Req::from_hyper(req);

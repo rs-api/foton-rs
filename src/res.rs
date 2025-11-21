@@ -1,14 +1,24 @@
-//! HTTP response with optimized serialization.
+//! HTTP response.
 
 use bytes::Bytes;
-use http_body_util::Full;
+use futures_util::TryStreamExt;
+use http_body_util::{BodyExt, Full, StreamBody as HttpStreamBody};
+use hyper::body::Frame;
 use hyper::{Response, StatusCode, header};
 use serde::Serialize;
+use std::future::Future;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 
 #[cfg(feature = "websocket")]
 use base64::{Engine as _, engine::general_purpose};
 #[cfg(feature = "websocket")]
 use sha1::{Digest, Sha1};
+
+use crate::{Error, Result};
+
+/// Boxed body type for responses.
+pub type BoxBody = http_body_util::combinators::BoxBody<Bytes, Error>;
 
 static CONTENT_TYPE_TEXT: header::HeaderValue =
     header::HeaderValue::from_static("text/plain; charset=utf-8");
@@ -17,9 +27,29 @@ static CONTENT_TYPE_HTML: header::HeaderValue =
 static CONTENT_TYPE_JSON: header::HeaderValue =
     header::HeaderValue::from_static("application/json");
 
+/// Channel sender for streaming response chunks.
+pub struct StreamSender {
+    tx: mpsc::Sender<Result<Bytes>>,
+}
+
+impl StreamSender {
+    /// Send a chunk of data.
+    pub async fn send(&mut self, data: impl Into<Bytes>) -> Result<()> {
+        self.tx
+            .send(Ok(data.into()))
+            .await
+            .map_err(|_| Error::Custom("Stream channel closed".into()))
+    }
+
+    /// Send text chunk.
+    pub async fn send_text(&mut self, text: impl Into<String>) -> Result<()> {
+        self.send(Bytes::from(text.into())).await
+    }
+}
+
 /// HTTP response.
 pub struct Res {
-    inner: Response<Full<Bytes>>,
+    inner: Response<BoxBody>,
     #[cfg(feature = "websocket")]
     ws_callback: Option<crate::websocket::WebSocketHandler>,
 }
@@ -29,7 +59,7 @@ impl Res {
     #[inline]
     pub fn new() -> Self {
         Self {
-            inner: Response::new(Full::new(Bytes::new())),
+            inner: Response::new(Full::new(Bytes::new()).map_err(|e| match e {}).boxed()),
             #[cfg(feature = "websocket")]
             ws_callback: None,
         }
@@ -37,7 +67,7 @@ impl Res {
 
     /// Wrap hyper response.
     #[inline]
-    pub fn from_hyper(inner: Response<Full<Bytes>>) -> Self {
+    pub fn from_hyper(inner: Response<BoxBody>) -> Self {
         Self {
             inner,
             #[cfg(feature = "websocket")]
@@ -47,7 +77,7 @@ impl Res {
 
     /// Unwrap to hyper response.
     #[inline]
-    pub fn into_hyper(self) -> Response<Full<Bytes>> {
+    pub fn into_hyper(self) -> Response<BoxBody> {
         self.inner
     }
 
@@ -58,10 +88,52 @@ impl Res {
         self.ws_callback.take()
     }
 
+    /// Create streaming response.
+    ///
+    /// Spawns handler to send chunks asynchronously via channel.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use rust_api::{Res, StreamSender};
+    ///
+    /// async fn handler() -> Res {
+    ///     Res::stream(|mut tx: StreamSender| async move {
+    ///         tx.send_text("chunk 1\n").await.ok();
+    ///         tx.send_text("chunk 2\n").await.ok();
+    ///     })
+    /// }
+    /// ```
+    pub fn stream<F, Fut>(handler: F) -> Self
+    where
+        F: FnOnce(StreamSender) -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        let (tx, rx) = mpsc::channel::<Result<Bytes>>(100);
+        let sender = StreamSender { tx };
+
+        tokio::spawn(async move {
+            handler(sender).await;
+        });
+
+        let stream = ReceiverStream::new(rx).map_ok(Frame::data);
+        let body = HttpStreamBody::new(stream).boxed();
+
+        Self {
+            inner: Response::new(body),
+            #[cfg(feature = "websocket")]
+            ws_callback: None,
+        }
+    }
+
     /// Text response.
     pub fn text(body: impl Into<String>) -> Self {
         let body_str = body.into();
-        let mut res = Response::new(Full::new(Bytes::from(body_str)));
+        let mut res = Response::new(
+            Full::new(Bytes::from(body_str))
+                .map_err(|e| match e {})
+                .boxed(),
+        );
         res.headers_mut()
             .insert(header::CONTENT_TYPE, CONTENT_TYPE_TEXT.clone());
         Self {
@@ -74,7 +146,11 @@ impl Res {
     /// HTML response.
     pub fn html(body: impl Into<String>) -> Self {
         let body_str = body.into();
-        let mut res = Response::new(Full::new(Bytes::from(body_str)));
+        let mut res = Response::new(
+            Full::new(Bytes::from(body_str))
+                .map_err(|e| match e {})
+                .boxed(),
+        );
         res.headers_mut()
             .insert(header::CONTENT_TYPE, CONTENT_TYPE_HTML.clone());
         Self {
@@ -88,7 +164,11 @@ impl Res {
     pub fn json<T: Serialize>(value: &T) -> Self {
         match serde_json::to_vec(value) {
             Ok(bytes) => {
-                let mut res = Response::new(Full::new(Bytes::from(bytes)));
+                let mut res = Response::new(
+                    Full::new(Bytes::from(bytes))
+                        .map_err(|e| match e {})
+                        .boxed(),
+                );
                 res.headers_mut()
                     .insert(header::CONTENT_TYPE, CONTENT_TYPE_JSON.clone());
                 Self {
@@ -99,7 +179,11 @@ impl Res {
             }
             Err(e) => {
                 let error_msg = format!(r#"{{"error": "JSON serialization failed: {}"}}"#, e);
-                let mut res = Response::new(Full::new(Bytes::from(error_msg)));
+                let mut res = Response::new(
+                    Full::new(Bytes::from(error_msg))
+                        .map_err(|e| match e {})
+                        .boxed(),
+                );
                 *res.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
                 res.headers_mut()
                     .insert(header::CONTENT_TYPE, CONTENT_TYPE_JSON.clone());
@@ -114,7 +198,7 @@ impl Res {
 
     /// Status-only response.
     pub fn status(code: u16) -> Self {
-        let mut res = Response::new(Full::new(Bytes::new()));
+        let mut res = Response::new(Full::new(Bytes::new()).map_err(|e| match e {}).boxed());
         *res.status_mut() = StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
         Self {
             inner: res,
@@ -149,7 +233,7 @@ impl Res {
         let hash = hasher.finalize();
         let accept_key = general_purpose::STANDARD.encode(&hash);
 
-        let mut res = Response::new(Full::new(Bytes::new()));
+        let mut res = Response::new(Full::new(Bytes::new()).map_err(|e| match e {}).boxed());
         *res.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
 
         let headers = res.headers_mut();
@@ -243,7 +327,11 @@ impl ResBuilder {
     /// Build text response.
     pub fn text(mut self, body: impl Into<String>) -> Res {
         let body_str = body.into();
-        let mut res = Response::new(Full::new(Bytes::from(body_str)));
+        let mut res = Response::new(
+            Full::new(Bytes::from(body_str))
+                .map_err(|e| match e {})
+                .boxed(),
+        );
         *res.status_mut() = self.status;
 
         if !self.headers.contains_key(header::CONTENT_TYPE) {
@@ -262,7 +350,11 @@ impl ResBuilder {
     /// Build HTML response.
     pub fn html(mut self, body: impl Into<String>) -> Res {
         let body_str = body.into();
-        let mut res = Response::new(Full::new(Bytes::from(body_str)));
+        let mut res = Response::new(
+            Full::new(Bytes::from(body_str))
+                .map_err(|e| match e {})
+                .boxed(),
+        );
         *res.status_mut() = self.status;
 
         if !self.headers.contains_key(header::CONTENT_TYPE) {
@@ -282,7 +374,11 @@ impl ResBuilder {
     pub fn json<T: Serialize>(mut self, value: &T) -> Res {
         match serde_json::to_vec(value) {
             Ok(bytes) => {
-                let mut res = Response::new(Full::new(Bytes::from(bytes)));
+                let mut res = Response::new(
+                    Full::new(Bytes::from(bytes))
+                        .map_err(|e| match e {})
+                        .boxed(),
+                );
                 *res.status_mut() = self.status;
 
                 if !self.headers.contains_key(header::CONTENT_TYPE) {
@@ -303,7 +399,7 @@ impl ResBuilder {
 
     /// Build with custom body.
     pub fn body(self, bytes: impl Into<Bytes>) -> Res {
-        let mut res = Response::new(Full::new(bytes.into()));
+        let mut res = Response::new(Full::new(bytes.into()).map_err(|e| match e {}).boxed());
         *res.status_mut() = self.status;
         *res.headers_mut() = self.headers;
         Res {

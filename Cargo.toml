@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "."
-, "examples/websocket-echo"]
+, "examples/streaming-demo", "examples/websocket-echo"]
 resolver = "2"
 
 [package]
@@ -29,6 +29,7 @@ exclude = [
 [dependencies]
 # Async runtime
 tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
 
 # HTTP server
 hyper = { version = "1", features = ["full"] }
@@ -49,6 +50,7 @@ bytes = "1"
 async-trait = "0.1"
 uuid = { version = "1", features = ["v4"] }
 paste = "1"
+futures-util = "0.3"
 
 # WebSocket support (optional)
 sha1 = { version = "0.10", optional = true }

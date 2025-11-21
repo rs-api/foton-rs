@@ -28,7 +28,9 @@ pub struct Req {
 
 impl Req {
     /// Create from hyper request.
-    pub fn from_hyper(mut req: Request<Incoming>) -> Self {
+    pub fn from_hyper(
+        #[cfg_attr(not(feature = "websocket"), allow(unused_mut))] mut req: Request<Incoming>,
+    ) -> Self {
         #[cfg(feature = "websocket")]
         let upgrade = Some(hyper::upgrade::on(&mut req));
 
