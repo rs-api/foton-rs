@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -17,7 +18,7 @@ use tokio::signal;
 use tokio::sync::watch;
 
 use crate::{
-    Error, ErrorHandler, Handler, IntoRes, Middleware, Req, Res, Result, Router,
+    Error, ErrorHandler, Handler, IntoRes, Middleware, Req, Res, Result, Router, ServerConfig,
     handler::IntoHandler,
 };
 
@@ -34,6 +35,14 @@ pub struct RustApi<S = ()> {
     state: Option<Arc<S>>,
     router: Option<matchit::Router<Arc<MethodHandlers<S>>>>,
     error_handler: Option<BoxedErrorHandler>,
+
+    // Configuration
+    body_limit: Option<usize>,
+    request_timeout: Option<Duration>,
+    handler_timeout: Option<Duration>,
+    http2_enabled: bool,
+    max_connections: Option<usize>,
+    keep_alive: Option<Duration>,
 }
 
 impl RustApi<()> {
@@ -45,6 +54,12 @@ impl RustApi<()> {
             state: Some(Arc::new(())),
             router: None,
             error_handler: None,
+            body_limit: None,
+            request_timeout: None,
+            handler_timeout: None,
+            http2_enabled: false,
+            max_connections: None,
+            keep_alive: None,
         }
     }
 }
@@ -60,6 +75,12 @@ impl<S: Send + Sync + 'static> RustApi<S> {
             state: Some(Arc::new(state)),
             router: None,
             error_handler: None,
+            body_limit: None,
+            request_timeout: None,
+            handler_timeout: None,
+            http2_enabled: false,
+            max_connections: None,
+            keep_alive: None,
         }
     }
 
@@ -162,6 +183,54 @@ impl<S: Send + Sync + 'static> RustApi<S> {
     /// Check if a route exists at the given path.
     pub fn has_route(&self, path: &str) -> bool {
         self.routes.iter().any(|(_, p, _, _)| p == path)
+    }
+
+    /// Set maximum request body size in bytes.
+    pub fn set_body_limit(&mut self, limit: usize) {
+        self.body_limit = Some(limit);
+    }
+
+    /// Set request timeout duration.
+    pub fn set_request_timeout(&mut self, timeout: Duration) {
+        self.request_timeout = Some(timeout);
+    }
+
+    /// Set handler execution timeout duration.
+    pub fn set_handler_timeout(&mut self, timeout: Duration) {
+        self.handler_timeout = Some(timeout);
+    }
+
+    /// Enable or disable HTTP/2 support.
+    pub fn set_http2(&mut self, enabled: bool) {
+        self.http2_enabled = enabled;
+    }
+
+    /// Set maximum number of concurrent connections.
+    pub fn set_max_connections(&mut self, max: usize) {
+        self.max_connections = Some(max);
+    }
+
+    /// Set TCP keep-alive duration.
+    pub fn set_keep_alive(&mut self, duration: Duration) {
+        self.keep_alive = Some(duration);
+    }
+
+    /// Apply configuration from a config struct.
+    pub fn apply_config(&mut self, config: ServerConfig) {
+        if let Some(limit) = config.body_limit {
+            self.body_limit = Some(limit);
+        }
+        if let Some(timeout) = config.request_timeout {
+            self.request_timeout = Some(timeout);
+        }
+        if let Some(timeout) = config.handler_timeout {
+            self.handler_timeout = Some(timeout);
+        }
+        self.http2_enabled = config.http2;
+        if let Some(max) = config.max_connections {
+            self.max_connections = Some(max);
+        }
+        self.keep_alive = config.keep_alive;
     }
 
     fn build_router(&mut self) {
@@ -380,6 +449,12 @@ where
             state: None,
             router: None,
             error_handler: None,
+            body_limit: None,
+            request_timeout: None,
+            handler_timeout: None,
+            http2_enabled: false,
+            max_connections: None,
+            keep_alive: None,
         }
     }
 }

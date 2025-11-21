@@ -15,6 +15,7 @@
 #![warn(rust_2018_idioms)]
 
 mod api;
+mod config;
 mod error;
 pub mod error_handler;
 pub mod extensions;
@@ -28,6 +29,7 @@ pub mod route;
 mod router;
 
 pub use api::RustApi;
+pub use config::ServerConfig;
 pub use error::{Error, Result};
 pub use error_handler::ErrorHandler;
 pub use extensions::Extensions;
