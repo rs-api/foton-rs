@@ -1,10 +1,12 @@
-# Rust API
-
-[![Crates.io](https://img.shields.io/crates/v/rust-api.svg)](https://crates.io/crates/rust-api)
-[![Documentation](https://docs.rs/rust-api/badge.svg)](https://docs.rs/rust-api)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-
-A fast and flexible web framework for Rust that encourages rapid development and clean, pragmatic design.
+<div align="center">
+  <img src="static/rust-api.png" alt="Rust API" width="200"/>
+  
+  [![Crates.io](https://img.shields.io/crates/v/rust-api.svg)](https://crates.io/crates/rust-api)
+  [![Documentation](https://docs.rs/rust-api/badge.svg)](https://docs.rs/rust-api)
+  [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](https://opensource.org/licenses/MIT)
+  
+  A fast and flexible web framework for Rust that encourages rapid development and clean, pragmatic design.
+</div>
 
 ## Documentation
 
