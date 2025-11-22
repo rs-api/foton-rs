@@ -89,10 +89,10 @@ impl<S: Send + Sync + 'static> RustApi<S> {
         self.error_handler = Some(Arc::new(handler));
     }
 
-    /// Use global middleware.
+    /// Attach global middleware.
     ///
     /// Middleware runs for all routes. Execution order matches registration order.
-    pub fn r#use<M: Middleware<S>>(&mut self, middleware: M) {
+    pub fn attach<M: Middleware<S>>(&mut self, middleware: M) {
         self.middlewares.push(Arc::new(middleware));
     }
 

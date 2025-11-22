@@ -8,11 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - 2024-11-22
 
 ### Changed
-- **API Improvement**: Renamed `.layer()` to `.use()` for better developer experience
-  - `app.use(middleware)` - More intuitive, inspired by Express.js
-  - `router.use(middleware)` - Consistent across all APIs
-  - `route.use(middleware)` - Clear intent
-  - Breaking change: Update all `.layer()` calls to `.use()`
+- **API Improvement**: Renamed `.layer()` to `.attach()` for better developer experience
+  - `app.attach(middleware)` - Clear, descriptive, inspired by Rocket
+  - `router.attach(middleware)` - Consistent across all APIs
+  - `route.attach(middleware)` - Plugin-like semantics
+  - Breaking change: Update all `.layer()` calls to `.attach()`
 
 ### Added
 - **WebSocket Support**: Full RFC 6455 compliant WebSocket implementation
@@ -39,17 +39,17 @@ Complete framework redesign with mutation-based API for maximum flexibility.
 - **API Redesign**: All builder methods converted to mutation methods
   - `RustApi::new()` now returns mutable instance
   - `.get()`, `.post()`, `.put()`, `.delete()`, `.patch()` now mutate instead of returning `Self`
-  - `.use()` now mutates instead of returning `Self` (was `.layer()`)
+  - `.attach()` now mutates instead of returning `Self` (was `.layer()`)
   - `.nest()` now mutates instead of returning `Self`
   - `.route()` now mutates instead of returning `Self`
   
 - **Router Redesign**: Router methods now mutate
   - `Router::get()`, `.post()`, etc. now take `&mut self`
-  - `Router::use()` now takes `&mut self` (was `.layer()`)
+  - `Router::attach()` now takes `&mut self` (was `.layer()`)
   - `Router::nest()` now takes `&mut self`
   
 - **Route Redesign**: Route middleware now uses mutation
-  - `Route::use()` now takes `&mut self` (was `.layer()`)
+  - `Route::attach()` now takes `&mut self` (was `.layer()`)
   
 - **Error Handler API**: Changed from builder to mutation
   - `RustApi::error_handler()` changed to `.set_error_handler(&mut self)`
@@ -95,7 +95,7 @@ let app = RustApi::new()
 
 ```rust
 let mut app = RustApi::new();
-app.use(cors_middleware);  // Changed from .layer() to .use()
+app.attach(cors_middleware);  // Changed from .layer() to .attach()
 app.get("/", handler);
 app.post("/users", create_user);
 app.nest("/api", router);
@@ -113,7 +113,7 @@ let router = Router::new()
 // After
 let mut router = Router::new();
 router.get("/users", handler);
-router.use(middleware);  // Changed from .layer() to .use()
+router.attach(middleware);  // Changed from .layer() to .attach()
 ```
 
 #### Route Changes:
@@ -125,7 +125,7 @@ let route = Route::get("/admin", handler)
 
 // After
 let mut route = Route::get("/admin", handler);
-route.use(auth_middleware);  // Changed from .layer() to .use()
+route.attach(auth_middleware);  // Changed from .layer() to .attach()
 ```
 
 ---
@@ -142,7 +142,7 @@ route.use(auth_middleware);  // Changed from .layer() to .use()
 - `When` conditional middleware helper (simplified from `ConditionalMiddleware`)
 
 ### Changed
-- Simplified `.use()` API to accept `Middleware` trait directly (was `.layer()`)
+- Simplified `.attach()` API to accept `Middleware` trait directly (was `.layer()`)
 - Improved middleware ergonomics with cleaner patterns
 
 ### Fixed
